@@ -1,0 +1,19 @@
+{
+    "atol": [
+        {
+            "type_connect": 0,
+            "com_port": "COM4",
+            "com_baudrate": "115200",
+            "ip": "ru.tuna.am",
+            "ip_port": "22579"
+        },
+        {
+            "type_connect": 0,
+            "com_port": "COM10",
+            "com_baudrate": "115200",
+            "ip": "ru.tuna.am",
+            "ip_port": "25531"
+        }
+    ]
+}
+

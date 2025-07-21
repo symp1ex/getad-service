@@ -1,0 +1,21 @@
+{
+    "service": {
+        "update": 1,
+        "updater_name": "updater.bat",
+        "reboot_file": "reboot.bat",
+        "log_level": "debug",
+        "log_days": 7
+    },
+    "validation_fn": {
+        "enabled": 1,
+        "interval": 12,
+        "trigger_days": 3,
+        "target_time": "05:30",
+        "delete_days": 21,
+        "logs_mask_name": "AtolFiscalRegister",
+        "logs_dir": "iiko",
+        "serialNumber_key": "serialNumber=",
+        "fnNumber_key": "fnNumber="
+    },
+    "fiscals": []
+}
