@@ -9,6 +9,7 @@ import socket
 import sys
 import os
 import atol
+import about
 
 class Service(win32serviceutil.ServiceFramework):
     _svc_name_ = "MH_Getad"  # Название службы
@@ -42,21 +43,21 @@ class Service(win32serviceutil.ServiceFramework):
     def main(self):
         config_name = "service.json"
         folder_name = "updater"
-        config = configs.read_config_file(logger.current_path, config_name, configs.service_data, create=True)
+        config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
         exe_name = config["service"].get("updater_name", "updater.bat")
 
         validation = config.get("validation_fn").get("enabled", 1)
-        update_enabled = config["service"].get("update", 1)
+        update_enabled = config["service"].get("updater_mode", 1)
 
         try:
             if update_enabled == 2:
                 atol.get_atol_data()
-                config = configs.read_config_file(logger.current_path, config_name, configs.service_data, create=True)
-                config["service"]["update"] = 666
+                config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
+                config["service"]["updater_mode"] = 333
                 configs.write_json_file(config, config_name)
                 configs.subprocess_run(folder_name, exe_name)
-            elif update_enabled == 666:
-                config["service"]["update"] = 2
+            elif update_enabled == 333:
+                config["service"]["updater_mode"] = 2
                 configs.write_json_file(config, config_name)
                 if validation == 1:
                     fn_check.fn_check_process(config_name, folder_name, exe_name, self)
@@ -69,7 +70,7 @@ class Service(win32serviceutil.ServiceFramework):
                 atol.get_atol_data()
                 self.SvcStop()
         except Exception:
-            logger.logger_service.critical(f"Что-то пошло сильно не так", exc_info=True)
+            logger.logger_service.critical(f"Запуск основного потока завершился с ошибкой", exc_info=True)
             os._exit(1)
 
 if __name__ == '__main__':

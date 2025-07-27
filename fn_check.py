@@ -5,6 +5,8 @@ import win32event
 from comautodetect import current_time
 from datetime import datetime, timedelta
 import configs
+import about
+import get_remote
 
 def check_validation_date(config, i):
     try:
@@ -13,7 +15,7 @@ def check_validation_date(config, i):
         get_current_time = current_time()
         trigger_days = config["validation_fn"].get("trigger_days", 3)
 
-        logger.logger_service.debug(f"Будет произведена проверка валидации для ФР №{serialNumber}")
+        logger.logger_service.info(f"Будет произведена проверка валидации для ФР №{serialNumber}")
         logger.logger_service.debug(f"Дата последней валидации: {validation_date}")
         logger.logger_service.debug(f"Количество дней, после которого валидация считается не пройденной: {trigger_days}")
 
@@ -37,24 +39,24 @@ def check_fiscal_register(config, i, file_name):
     get_current_time = current_time()
 
     if logs_dir == "iiko":
-        from get_remote import get_user_appdata
-        logs_dir = os.path.join(get_user_appdata(), 'iiko', 'Cashserver', 'logs')
+        target_folder_path = "iiko\\cashserver"
+        logs_dir = os.path.join(get_remote.get_user_appdata(target_folder_path), 'iiko', 'Cashserver', 'logs')
 
     try:
         # Находим все подходящие файлы
         log_files = [
             os.path.join(logs_dir, filename)
             for filename in os.listdir(logs_dir)
-            if mask_name in filename
+            if mask_name in filename and filename.endswith('.log')
         ]
 
         if not log_files:
             logger.logger_service.warning(f"Файл лога, содержащий в названии %{mask_name}% не найден, невозможно провести валидацию")
             return "skip"
-        else:
-            logger.logger_service.debug(f"Найденные следущие файлы логов по пути: {logs_dir}")
-            for log_file in log_files:
-                logger.logger_service.debug(log_file)
+
+        logger.logger_service.debug(f"Найденные следущие файлы логов по пути: {logs_dir}")
+        for log_file in log_files:
+            logger.logger_service.debug(log_file)
 
         # Находим файл с самой поздней датой изменения
         latest_file = max(log_files, key=os.path.getmtime)
@@ -75,8 +77,8 @@ def check_fiscal_register(config, i, file_name):
                         logger.logger_service.info(f"Соответствие ФР и ФН проверено: {log_fn == fn_serial}")
                         if log_fn == fn_serial:
                             json_name = f"{serial_number}.json"
-                            json_path = os.path.join(logger.current_path, "date", json_name)
-                            json_file = configs.read_config_file(logger.current_path, json_path, "", create=False)
+                            json_path = os.path.join(about.current_path, "date", json_name)
+                            json_file = configs.read_config_file(about.current_path, json_path, "", create=False)
 
                             config["fiscals"][i]["v_time"] = get_current_time
                             configs.write_json_file(config, file_name)
@@ -108,8 +110,8 @@ def check_fiscal_register(config, i, file_name):
         return "skip"
 
 def fn_check_process(config_name, folder_name, exe_name, service_instance):
-    config = configs.read_config_file(logger.current_path, config_name, configs.service_data, create=True)
-    update_enabled = config["service"].get("update", 1)
+    config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
+    update_enabled = config["service"].get("updater_mode", 1)
 
     interval_in_hours = config["validation_fn"].get("interval", 24)
     interval = 3600000 * interval_in_hours
@@ -133,8 +135,8 @@ def fn_check_process(config_name, folder_name, exe_name, service_instance):
 
             if update_flag == 1:
                 if update_enabled == 2:
-                    config = configs.read_config_file(logger.current_path, config_name, configs.service_data, create=True)
-                    config["service"]["update"] = 666
+                    config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
+                    config["service"]["updater_mode"] = 333
                     configs.write_json_file(config, config_name)
                 configs.subprocess_run(folder_name, exe_name)
             if reboot_flag == 1:
@@ -152,11 +154,12 @@ def fn_check_process(config_name, folder_name, exe_name, service_instance):
                 logger.logger_service.info(f"Будет запущен файл '{reboot_file}'")
                 configs.subprocess_run("", reboot_file)
 
+            logger.logger_service.info(f"До следующей проверки осталось {interval_in_hours} часов")
             rc = win32event.WaitForSingleObject(service_instance.hWaitStop, interval)
             if rc == win32event.WAIT_OBJECT_0:
                 break
     except Exception:
-        logger.logger_service.critical(f"Основной поток приказал долго жить ;(",
+        logger.logger_service.critical(f"Произошло нештатное прерывание основного потока",
                                 exc_info=True)
         os._exit(1)
 
@@ -184,7 +187,7 @@ def get_seconds_until_next_time(target_time):
 
 def remove_empty_serials_from_file():
     config_name = "service.json"
-    config = configs.read_config_file(logger.current_path, config_name, configs.service_data, create=True)
+    config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
 
     try:
         # Проверяем, есть ли пустые serialNumber

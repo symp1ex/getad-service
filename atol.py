@@ -1,4 +1,4 @@
-import logger, configs
+import logger, configs, about
 import json
 import os
 import shutil
@@ -39,7 +39,7 @@ def checkstatus_getdate(fptr, IFptr, port, installed_version):
 def connect_kkt(fptr, IFptr, index):
     try:
         file_name = "connect.json"
-        config = configs.read_config_file(logger.current_path, file_name, configs.connect_data, create=True) or {}  # если нет конфигурации, используем пустой словарь
+        config = configs.read_config_file(about.current_path, file_name, configs.connect_data, create=True) or {}  # если нет конфигурации, используем пустой словарь
         connections = config.get("atol")
 
         settings_map = {
@@ -233,10 +233,10 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
             "litemanager_id": str(litemanager_id),
             "current_time": str(get_current_time),
             "v_time": str(get_current_time),
-            "vc": str(logger.version)
+            "vc": str(about.version)
         }
         folder_name = "date"
-        folder_path = os.path.join(logger.current_path, folder_name)
+        folder_path = os.path.join(about.current_path, folder_name)
         json_name = f"{serialNumber}.json"
         configs.create_json_file(folder_path, json_name, date_json)
     except Exception:
@@ -255,10 +255,10 @@ def get_date_non_kkt():
         "anydesk_id": str(anydesk_id),
         "litemanager_id": str(litemanager_id),
         "current_time": str(get_current_time),
-        "vc": str(logger.version)
+        "vc": str(about.version)
     }
     folder_name = "date"
-    folder_path = os.path.join(logger.current_path, folder_name)
+    folder_path = os.path.join(about.current_path, folder_name)
     json_name = f"TV{teamviever_id}_AD{anydesk_id}.json"
     configs.create_json_file(folder_path, json_name, date_json)
 
@@ -278,7 +278,7 @@ def get_remote():
 
 def rm_old_date():
     try:
-        old_date = os.path.join(logger.current_path, "date")
+        old_date = os.path.join(about.current_path, "date")
         if os.path.exists(old_date):
             shutil.rmtree(old_date)
             logger.logger_getad.info(f"Старые данные успешно удалены")
@@ -286,7 +286,7 @@ def rm_old_date():
         logger.logger_getad.error(f"Error: Не удалось удалить старые данные", exc_info=True)
 
 def get_atol_data():
-    fptr10_path = os.path.join(logger.current_path, "fptr10.dll")
+    fptr10_path = os.path.join(about.current_path, "fptr10.dll")
 
     try:
         from libfptr108 import IFptr  # подтягиваем библиотеку от 10.8 и проверяем версию
@@ -330,7 +330,7 @@ def get_atol_data():
         logger.logger_getad.error(f"Не удалось инициализировать драйвер", exc_info=True)
 
     file_name = "connect.json"
-    config = configs.read_config_file(logger.current_path, file_name, configs.connect_data, create=True)
+    config = configs.read_config_file(about.current_path, file_name, configs.connect_data, create=True)
 
     try:
         if config is not None and not config.get("atol")[0]["type_connect"] == 0:

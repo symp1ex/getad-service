@@ -3,21 +3,7 @@ import sys
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime
-
-version = "2.0.2.1"
-
-'''
-в зависимости от того, как запускается служба, нужно менять переменную current_path
-
-#отладочный путь под .py-скрипт
-current_path = os.path.dirname(os.path.abspath(__file__))
-
-#путь под собранный .exe-файл
-current_path = os.path.dirname(sys.executable)
-'''
-
-#путь под собранный .exe-файл
-current_path = os.path.dirname(sys.executable)
+import about
 
 class StdoutRedirectHandler(logging.StreamHandler):
     def __init__(self):
@@ -37,11 +23,11 @@ def logger(file_name, with_console=False):
     import configs
 
     config_name = "service.json"
-    config = configs.read_config_file(current_path, config_name, configs.service_data, create=True)
+    config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
     days = config["service"].get("log_days", 1)
 
     name_log_folder = "logs"
-    log_folder = os.path.join(current_path, name_log_folder)
+    log_folder = os.path.join(about.current_path, name_log_folder)
 
     if not os.path.exists(log_folder):
         os.makedirs(log_folder)

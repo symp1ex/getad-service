@@ -2,6 +2,7 @@ import logger
 import json
 import os
 import subprocess
+import about
 
 connect_data = {
     "atol": [
@@ -24,14 +25,14 @@ connect_data = {
 
 service_data = {
     "service": {
-        "update": 1,
+        "updater_mode": 1,
         "updater_name": "updater.bat",
         "reboot_file": "reboot.bat",
         "log_level": "info",
         "log_days": 7
     },
     "validation_fn": {
-        "enabled": 1,
+        "enabled": True,
         "interval": 24,
         "trigger_days": 3,
         "target_time": "05:30",
@@ -45,7 +46,7 @@ service_data = {
 }
 
 def write_json_file(config, file_name):
-    file_path = os.path.join(logger.current_path, file_name)
+    file_path = os.path.join(about.current_path, file_name)
     try:
         with open(file_path, "w", encoding="utf-8") as file:
             json.dump(config, file, ensure_ascii=False, indent=4)
@@ -81,7 +82,7 @@ def create_json_file(folder_name, file_name, data):
 
 def update_correlation_fiscals(serialNumber, fn_serial, get_current_time):
     service_file_name = "service.json"
-    service_json_path = logger.current_path
+    service_json_path = about.current_path
 
     try:
         service_data = read_config_file(service_json_path, service_file_name, "", create=False)
@@ -105,14 +106,13 @@ def update_correlation_fiscals(serialNumber, fn_serial, get_current_time):
             })
         # Запись обновленного содержимого обратно в service.json
         write_json_file(service_data, "service.json")
-        logger.logger_service.info(f"Файл '{service_json_path}' успешно обновлен")
     except Exception:
         logger.logger_service.error(f"Не удалось обновить '{service_json_path}'", exc_info=True)
 
 def subprocess_run(folder_name, file_name):
-    exe_path = os.path.join(logger.current_path, folder_name, file_name)
+    exe_path = os.path.join(about.current_path, folder_name, file_name)
     try:
-        working_directory = os.path.join(logger.current_path,
+        working_directory = os.path.join(about.current_path,
                                          folder_name)  # получаем абсолютный путь к основному файлу скрипта sys.argv[0], а затем с помощью os.path.dirname() извлекаем путь к директории, содержащей основной файл
         subprocess.Popen(exe_path, cwd=working_directory)
         logger.logger_service.info(f"Будет запущен '{exe_path}'")

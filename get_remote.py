@@ -8,7 +8,8 @@ import win32security
 #import ctypes
 
 def get_server_url():
-    xml_path = os.path.join(get_user_appdata(), 'iiko', 'Cashserver', 'config.xml')
+    target_folder_path = "iiko\\cashserver"
+    xml_path = os.path.join(get_user_appdata(target_folder_path), 'iiko', 'Cashserver', 'config.xml')
     try:
         # Загрузка XML-файла
         tree = ET.parse(xml_path)
@@ -91,7 +92,8 @@ def get_litemanager_id():
         logger.logger_getad.error(f"Произошла ошибка при чтении реестра", exc_info=True)
 
 def get_anydesk_id():
-    conf_path = os.path.join(get_user_appdata(), 'anydesk', 'system.conf')
+    target_folder_path = "anydesk"
+    conf_path = os.path.join(get_user_appdata(target_folder_path), 'anydesk', 'system.conf')
     try:
         with open(conf_path, 'r', encoding='utf-8') as file:
             for line in file:
@@ -114,7 +116,8 @@ def get_hostname():
         logger.logger_getad.error(f"Не удалось получить имя хоста", exc_info=True)
         return hostname
 
-def get_user_appdata():
+def get_user_appdata(target_folder_path):
+    logger.logger_getad.debug(f"Пытаемся найти домашннюю директорию активного пользователя")
     try:
         # Получаем список активных сессий
         sessions = win32ts.WTSEnumerateSessions(win32ts.WTS_CURRENT_SERVER_HANDLE)
@@ -135,22 +138,41 @@ def get_user_appdata():
                     if os.path.exists(user_path):
                         logger.logger_getad.debug(f"Найден активный пользователь, его домашняя директория: '{user_path}'")
                         return user_path
-
+        logger.logger_getad.debug("Активный пользователь не найден")
     except Exception as e:
         logger.logger_getad.error(f"Ошибка при получении пути AppData: {e}")
 
         # Если не удалось получить путь активного пользователя,
-        # попробуем получить путь первого найденного пользователя
+        # попробуем получить путь первого найденного пользователя у которого будет найден искомый путь
+    logger.logger_getad.debug(f"Пытаемся найти пользователя, домашнняя директория которого содержит '{target_folder_path}'")
     try:
         users_path = r'C:\Users'
+        system_users = ['Public', 'Default', 'Default User', 'All Users',
+                        'LocalService', 'NetworkService', 'system']
+
+        # Получаем список всех не системных пользователей
         users = [d for d in os.listdir(users_path)
                  if os.path.isdir(os.path.join(users_path, d))
-                 and d not in ['Public', 'Default', 'Default User', 'All Users',
-                               'LocalService', 'NetworkService', 'system']]
+                 and d not in system_users]
 
-        if users:
-            home_path = os.path.join(users_path, users[0], 'AppData', 'Roaming')
-            logger.logger_getad.debug(f"Найден первый не системный пользователь, его домашняя директория: '{home_path}'")
+        # Список для хранения пользователей с искомой папкой
+        users_with_folder = []
+
+        for user in users:
+            # Составляем полный путь к целевой папке для текущего пользователя
+            full_path = os.path.join(users_path, user, 'AppData', 'Roaming', target_folder_path)
+
+            # Проверяем существование папки
+            if os.path.exists(full_path) and os.path.isdir(full_path):
+                users_with_folder.append(user)
+
+        logger.logger_getad.debug(f"Список пользователей, домашняя директория которых содержит искомый путь '{target_folder_path}':\n{users_with_folder}")
+
+        if users_with_folder:
+            # Получаем путь к папке первого подходящего пользователя
+            first_user = users_with_folder[0]
+            home_path = os.path.join(users_path, first_user, 'AppData', 'Roaming')
+            logger.logger_getad.debug(f"Будет использоваться домашняя директория пользователя: '{first_user}'")
             return home_path
 
     except Exception as e:
