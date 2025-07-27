@@ -22,6 +22,15 @@ class StdoutRedirectHandler(logging.StreamHandler):
 def logger(file_name, with_console=False):
     import configs
 
+    # Словарь для маппинга строковых значений в константы logging
+    LOG_LEVELS = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL
+    }
+
     config_name = "service.json"
     config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
     days = config["service"].get("log_days", 1)
@@ -32,9 +41,13 @@ def logger(file_name, with_console=False):
     if not os.path.exists(log_folder):
         os.makedirs(log_folder)
 
+    log_level = config['service'].get('log_level', 'INFO').upper()  # INFO будет значением по умолчанию
+    if log_level not in LOG_LEVELS:
+        log_level = "INFO"
+
     # Создаем логгер
     logger = logging.getLogger(file_name)
-    logger.setLevel(logging.DEBUG)  # Устанавливаем уровень логирования
+    logger.setLevel(LOG_LEVELS[log_level])
 
     # Проверяем, не был ли уже добавлен обработчик для этого логгера
     if not logger.hasHandlers():
@@ -46,7 +59,7 @@ def logger(file_name, with_console=False):
             backupCount=days,     # Хранить архивы не дольше 7 дней
             encoding="utf-8"
         )
-        file_handler.setLevel(logging.DEBUG)
+        file_handler.setLevel(LOG_LEVELS[log_level])
 
         # Форматтер для настройки формата сообщений
         formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
