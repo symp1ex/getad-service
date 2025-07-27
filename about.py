@@ -1,6 +1,7 @@
 import os
+import sys
 
-version = "2.0.2.5"
+version = "2.0.2.6"
 
 '''
 в зависимости от того, как запускается служба, нужно менять переменную current_path
@@ -12,5 +13,5 @@ current_path = os.path.dirname(os.path.abspath(__file__))
 current_path = os.path.dirname(sys.executable)
 '''
 
-#отладочный путь под .py-скрипт
-current_path = os.path.dirname(os.path.abspath(__file__))
+#путь под собранный .exe-файл
+current_path = os.path.dirname(sys.executable)

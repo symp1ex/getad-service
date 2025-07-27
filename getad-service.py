@@ -36,6 +36,7 @@ class Service(win32serviceutil.ServiceFramework):
             (self._svc_name_, '')
         )
         logger.logger_service.info("Служба запущена")
+        logger.logger_service.info(f"Версия исполянемого файла: {about.version}")
         service_path = os.path.dirname(os.path.abspath(__file__))
         logger.logger_service.info(f"Рабочая директория: '{service_path}'")
         self.main()
