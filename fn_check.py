@@ -10,10 +10,17 @@ import get_remote
 
 def check_validation_date(config, i):
     try:
-        serialNumber = config.get("fiscals")[i]["serialNumber"]
-        validation_date = config.get("fiscals")[i]["v_time"]
+        try:
+            serialNumber = config.get("fiscals")[i]["serialNumber"]
+            validation_date = config.get("fiscals")[i]["v_time"]
+        except Exception:
+            logger.logger_service.error(f"Не удалось получить значение запрашиваемого ключа из конфига",
+                                        exc_info=True)
+
         get_current_time = current_time()
-        trigger_days = config["validation_fn"].get("trigger_days", 3)
+
+        try: trigger_days = int(config["validation_fn"].get("trigger_days", 3))
+        except Exception: trigger_days = 3
 
         logger.logger_service.info(f"Будет произведена проверка валидации для ФР №{serialNumber}")
         logger.logger_service.debug(f"Дата последней валидации: {validation_date}")
@@ -28,15 +35,22 @@ def check_validation_date(config, i):
 
 def check_fiscal_register(config, i, file_name):
     # Получаем значения из JSON
-    serial_number = config.get("fiscals")[i]['serialNumber']
-    fn_serial = config.get("fiscals")[i]['fn_serial']
-    validation_date = config.get("fiscals")[i]["v_time"]
+    try:
+        serial_number = config.get("fiscals")[i]['serialNumber']
+        fn_serial = config.get("fiscals")[i]['fn_serial']
+        validation_date = config.get("fiscals")[i]["v_time"]
+    except Exception:
+        logger.logger_service.error(f"Не удалось получить значение запрашиваемого ключа из конфига",
+                                    exc_info=True)
+
     mask_name = config.get("validation_fn")['logs_mask_name']
     logs_dir = config.get("validation_fn")['logs_dir']
     serialNumber_key = config.get("validation_fn")['serialNumber_key']
     fnNumber_key = config.get("validation_fn")['fnNumber_key']
-    delete_days = config["validation_fn"].get("delete_days", 21)
     get_current_time = current_time()
+
+    try: delete_days = int(config["validation_fn"].get("delete_days", 21))
+    except Exception: delete_days = 21
 
     if logs_dir == "iiko":
         target_folder_path = "iiko\\cashserver"
@@ -84,6 +98,7 @@ def check_fiscal_register(config, i, file_name):
                             configs.write_json_file(config, file_name)
 
                             json_file["v_time"] = get_current_time
+                            json_file["vc"] = about.version
                             configs.write_json_file(json_file, json_path)
                             return True
                         return False
@@ -111,9 +126,12 @@ def check_fiscal_register(config, i, file_name):
 
 def fn_check_process(config_name, folder_name, exe_name, service_instance):
     config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
-    update_enabled = config["service"].get("updater_mode", 1)
+    try: update_enabled = int(config["service"].get("updater_mode", 1))
+    except Exception: update_enabled = 1
 
-    interval_in_hours = config["validation_fn"].get("interval", 24)
+    try: interval_in_hours = int(config["validation_fn"].get("interval", 24))
+    except Exception: interval_in_hours = 24
+
     interval = 3600000 * interval_in_hours
 
     try:

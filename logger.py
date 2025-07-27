@@ -33,7 +33,9 @@ def logger(file_name, with_console=False):
 
     config_name = "service.json"
     config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
-    days = config["service"].get("log_days", 1)
+
+    try: days = int(config["service"].get("log_days", 7))
+    except Exception: days = 7
 
     name_log_folder = "logs"
     log_folder = os.path.join(about.current_path, name_log_folder)

@@ -26,14 +26,14 @@ connect_data = {
 service_data = {
     "service": {
         "updater_mode": 1,
-        "updater_name": "updater.bat",
+        "updater_name": "updater.exe",
         "reboot_file": "reboot.bat",
         "log_level": "info",
         "log_days": 7
     },
     "validation_fn": {
         "enabled": True,
-        "interval": 24,
+        "interval": 12,
         "trigger_days": 3,
         "target_time": "05:30",
         "delete_days": 21,
@@ -76,7 +76,6 @@ def create_json_file(folder_name, file_name, data):
         if not os.path.exists(folder_name):
             os.makedirs(folder_name)
         write_json_file(data, json_file)
-        logger.logger_service.info(f"Создан '{json_file}'")
     except Exception:
         logger.logger_service.error(f"Не удалось записать данные при создании файла: '{json_file}'", exc_info=True)
 
