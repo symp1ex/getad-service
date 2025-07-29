@@ -43,6 +43,9 @@ def check_fiscal_register(config, i, file_name):
         logger.logger_service.error(f"Не удалось получить значение запрашиваемого ключа из конфига",
                                     exc_info=True)
 
+    try: trigger_days = int(config["validation_fn"].get("trigger_days", 3))
+    except Exception: trigger_days = 3
+
     mask_name = config.get("validation_fn")['logs_mask_name']
     logs_dir = config.get("validation_fn")['logs_dir']
     serialNumber_key = config.get("validation_fn")['serialNumber_key']
@@ -72,8 +75,21 @@ def check_fiscal_register(config, i, file_name):
         for log_file in log_files:
             logger.logger_service.debug(log_file)
 
+
+        log_days_update = datetime.strptime(get_current_time, "%Y-%m-%d %H:%M:%S") - timedelta(days=trigger_days)
+
+        # Фильтруем файлы, оставляя только те, которые не старше 3 дней
+        recent_files = [
+            f for f in log_files
+            if datetime.fromtimestamp(os.path.getmtime(f)) > log_days_update
+        ]
+
+        if not recent_files:
+            logger.logger_service.warning(f"Не найдено логов, которые обновлялись бы менее '{trigger_days}' дней назад")
+            return "skip"
+
         # Находим файл с самой поздней датой изменения
-        latest_file = max(log_files, key=os.path.getmtime)
+        latest_file = max(recent_files, key=os.path.getmtime)
         logger.logger_service.info(f"Будет произведён поиск ФР №{serial_number} по файлу: '{latest_file}'")
 
         # Регулярка для поиска нужной строки

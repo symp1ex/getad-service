@@ -156,23 +156,25 @@ def get_user_appdata(target_folder_path):
                  and d not in system_users]
 
         # Список для хранения пользователей с искомой папкой
-        users_with_folder = []
+        users_with_folder = {}
 
         for user in users:
             # Составляем полный путь к целевой папке для текущего пользователя
             full_path = os.path.join(users_path, user, 'AppData', 'Roaming', target_folder_path)
 
             # Проверяем существование папки
-            if os.path.exists(full_path) and os.path.isdir(full_path):
-                users_with_folder.append(user)
+            if os.path.exists(full_path):
+                # Получаем время последней модификации
+                mod_time = os.path.getmtime(full_path)
+                users_with_folder[user] = mod_time
 
         logger.logger_getad.debug(f"Список пользователей, домашняя директория которых содержит искомый путь '{target_folder_path}':\n{users_with_folder}")
 
         if users_with_folder:
             # Получаем путь к папке первого подходящего пользователя
-            first_user = users_with_folder[0]
-            home_path = os.path.join(users_path, first_user, 'AppData', 'Roaming')
-            logger.logger_getad.debug(f"Будет использоваться домашняя директория пользователя: '{first_user}'")
+            latest_user = max(users_with_folder.items(), key=lambda x: x[1])[0]
+            home_path = os.path.join(users_path, latest_user, 'AppData', 'Roaming')
+            logger.logger_getad.debug(f"Будет использоваться домашняя директория пользователя: '{latest_user}'")
             return home_path
 
     except Exception as e:
