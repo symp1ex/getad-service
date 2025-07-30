@@ -17,5 +17,10 @@
         "serialNumber_key": "serialNumber=",
         "fnNumber_key": "fnNumber="
     },
+    "notification": {
+        "enabled": false,
+        "bot_token": "",
+        "chat_id": ""
+    },
     "fiscals": []
 }

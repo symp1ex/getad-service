@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import configs
 import about
 import get_remote
+import tg_notification
 
 def check_validation_date(config, i):
     try:
@@ -59,6 +60,12 @@ def check_fiscal_register(config, i, file_name):
         target_folder_path = "iiko\\cashserver"
         logs_dir = os.path.join(get_remote.get_user_appdata(target_folder_path), 'iiko', 'Cashserver', 'logs')
 
+    if not os.path.exists(logs_dir):
+        logger.logger_service.warning(
+            f"Путь до папки с логами: '{logs_dir}' не найден, невозможно провести валидацию")
+        disable_check_fr(get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
+        return "skip"
+
     try:
         # Находим все подходящие файлы
         log_files = [
@@ -69,6 +76,7 @@ def check_fiscal_register(config, i, file_name):
 
         if not log_files:
             logger.logger_service.warning(f"Файл лога, содержащий в названии %{mask_name}% не найден, невозможно провести валидацию")
+            disable_check_fr(get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
             return "skip"
 
         logger.logger_service.debug(f"Найденные следущие файлы логов по пути: {logs_dir}")
@@ -86,6 +94,7 @@ def check_fiscal_register(config, i, file_name):
 
         if not recent_files:
             logger.logger_service.warning(f"Не найдено логов, которые обновлялись бы менее '{trigger_days}' дней назад")
+            disable_check_fr(get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
             return "skip"
 
         # Находим файл с самой поздней датой изменения
@@ -120,20 +129,7 @@ def check_fiscal_register(config, i, file_name):
                         return False
 
         logger.logger_service.warning(f"Запись об ФР №{serial_number}, не найдена в файле {latest_file}")
-
-        difference_in_days = (datetime.strptime(get_current_time, "%Y-%m-%d %H:%M:%S") -
-                              datetime.strptime(validation_date, "%Y-%m-%d %H:%M:%S")).days
-
-        if difference_in_days > delete_days:
-            logger.logger_service.warning(
-                f"С последней валидации ФР №{serial_number} прошло более {delete_days} дней, запись будет удалена")
-
-            config["fiscals"][i] = {
-                "serialNumber": "",
-                "fn_serial": "",
-                "v_time": ""
-            }
-            configs.write_json_file(config, file_name)
+        disable_check_fr(get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
         return "skip"
     except Exception:
         logger.logger_service.error(f"Неизвестная ошибка при парсинге лога, мне жаль ;(",
@@ -235,3 +231,24 @@ def remove_empty_serials_from_file():
     except Exception:
         logger.logger_service.error(f"Не удалось очистить конфиг от неактуальных ФР",
                                     exc_info=True)
+
+def disable_check_fr(get_current_time, validation_date, delete_days, serial_number, config, i, file_name):
+    try: notification_enabled = int(config["notification"].get('enabled', 0))
+    except: notification_enabled = 0
+
+    difference_in_days = (datetime.strptime(get_current_time, "%Y-%m-%d %H:%M:%S") -
+                          datetime.strptime(validation_date, "%Y-%m-%d %H:%M:%S")).days
+
+    if difference_in_days > delete_days:
+        logger.logger_service.warning(
+            f"С последней валидации ФР №{serial_number} прошло более {delete_days} дней, запись будет удалена")
+
+        config["fiscals"][i] = {
+            "serialNumber": "",
+            "fn_serial": "",
+            "v_time": ""
+        }
+        configs.write_json_file(config, file_name)
+        if notification_enabled == True:
+            logger.logger_service.info("Уведомление об удалении будет отправлено в ТГ")
+            tg_notification.send_tg_delete(serial_number, delete_days)

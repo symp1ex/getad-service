@@ -42,6 +42,11 @@ service_data = {
         "serialNumber_key": "serialNumber=",
         "fnNumber_key": "fnNumber="
     },
+    "notification": {
+        "enabled": False,
+        "bot_token": "",
+        "chat_id": ""
+    },
     "fiscals": []
 }
 
