@@ -21,9 +21,9 @@ def get_server_url():
         # Получаем текст из элемента <serverUrl>
         return server_url_element.text
     except FileNotFoundError:
-        logger.logger_getad.warn(f"Файл '{xml_path}' не найден.")
+        logger.logger_service.warn(f"Файл '{xml_path}' не найден.")
     except Exception:
-        logger.logger_getad.error(f"Произошла ошибка при чтении файла 'cashserver/config.xml'", exc_info=True)
+        logger.logger_service.error(f"Произошла ошибка при чтении файла 'cashserver/config.xml'", exc_info=True)
 
 
 def get_teamviewer_id():
@@ -37,7 +37,7 @@ def get_teamviewer_id():
     except FileNotFoundError:
         pass  # Продолжаем проверку в другом разделе
     except Exception:
-        logger.logger_getad.error(f"Произошла ошибка при чтении реестра", exc_info=True)
+        logger.logger_service.error(f"Произошла ошибка при чтении реестра", exc_info=True)
 
     try:
         # Если значение не найдено в разделе для 64-битных приложений,
@@ -48,9 +48,9 @@ def get_teamviewer_id():
             if value:
                 return value
     except FileNotFoundError:
-        logger.logger_getad.warn('Реестровый ключ "ClientID" для TeamViewer не найден.')
+        logger.logger_service.warn('Реестровый ключ "ClientID" для TeamViewer не найден.')
     except Exception:
-        logger.logger_getad.error(f"Произошла ошибка при чтении реестра", exc_info=True)
+        logger.logger_service.error(f"Произошла ошибка при чтении реестра", exc_info=True)
 
 def get_litemanager_id():
     try:
@@ -87,9 +87,9 @@ def get_litemanager_id():
         else:
             return None
     except FileNotFoundError:
-        logger.logger_getad.warn('Реестровый ключ "ID (read only)" для LiteManager не найден.')
+        logger.logger_service.warn('Реестровый ключ "ID (read only)" для LiteManager не найден.')
     except Exception:
-        logger.logger_getad.error(f"Произошла ошибка при чтении реестра", exc_info=True)
+        logger.logger_service.error(f"Произошла ошибка при чтении реестра", exc_info=True)
 
 def get_anydesk_id():
     target_folder_path = "anydesk"
@@ -100,12 +100,12 @@ def get_anydesk_id():
                 if line.startswith("ad.anynet.id"):
                     ad_anynet_id = line.split("=")[1].strip()
                     return ad_anynet_id
-        logger.logger_getad.warn(f"Параметр 'ad.anynet.id' не найден в '{conf_path}'.")
+        logger.logger_service.warn(f"Параметр 'ad.anynet.id' не найден в '{conf_path}'.")
         return None
     except FileNotFoundError:
-        logger.logger_getad.warn(f"Файл '{conf_path}' не найден.")
+        logger.logger_service.warn(f"Файл '{conf_path}' не найден.")
     except Exception:
-        logger.logger_getad.error(f'Error: ошибка при получении anydesk_id из {conf_path}', exc_info=True)
+        logger.logger_service.error(f'Error: ошибка при получении anydesk_id из {conf_path}', exc_info=True)
 
 def get_hostname():
     try:
@@ -113,11 +113,11 @@ def get_hostname():
         return hostname
     except Exception:
         hostname = "hostname"
-        logger.logger_getad.error(f"Не удалось получить имя хоста", exc_info=True)
+        logger.logger_service.error(f"Не удалось получить имя хоста", exc_info=True)
         return hostname
 
 def get_user_appdata(target_folder_path):
-    logger.logger_getad.debug(f"Пытаемся найти домашннюю директорию активного пользователя")
+    logger.logger_service.debug(f"Пытаемся найти домашннюю директорию активного пользователя")
     try:
         # Получаем список активных сессий
         sessions = win32ts.WTSEnumerateSessions(win32ts.WTS_CURRENT_SERVER_HANDLE)
@@ -136,15 +136,15 @@ def get_user_appdata(target_folder_path):
                     # Формируем путь
                     user_path = os.path.join('C:\\Users', username, 'AppData', 'Roaming')
                     if os.path.exists(user_path):
-                        logger.logger_getad.debug(f"Найден активный пользователь, его домашняя директория: '{user_path}'")
+                        logger.logger_service.debug(f"Найден активный пользователь, его домашняя директория: '{user_path}'")
                         return user_path
-        logger.logger_getad.debug("Активный пользователь не найден")
+        logger.logger_service.debug("Активный пользователь не найден")
     except Exception as e:
-        logger.logger_getad.error(f"Ошибка при получении пути AppData: {e}")
+        logger.logger_service.error(f"Ошибка при получении пути AppData: {e}")
 
         # Если не удалось получить путь активного пользователя,
         # попробуем получить путь первого найденного пользователя у которого будет найден искомый путь
-    logger.logger_getad.debug(f"Пытаемся найти пользователя, домашнняя директория которого содержит '{target_folder_path}'")
+    logger.logger_service.debug(f"Пытаемся найти пользователя, домашнняя директория которого содержит '{target_folder_path}'")
     try:
         users_path = r'C:\Users'
         system_users = ['Public', 'Default', 'Default User', 'All Users',
@@ -168,17 +168,17 @@ def get_user_appdata(target_folder_path):
                 mod_time = os.path.getmtime(full_path)
                 users_with_folder[user] = mod_time
 
-        logger.logger_getad.debug(f"Список пользователей, домашняя директория которых содержит искомый путь '{target_folder_path}':\n{users_with_folder}")
+        logger.logger_service.debug(f"Список пользователей, домашняя директория которых содержит искомый путь '{target_folder_path}':\n{users_with_folder}")
 
         if users_with_folder:
             # Получаем путь к папке первого подходящего пользователя
             latest_user = max(users_with_folder.items(), key=lambda x: x[1])[0]
             home_path = os.path.join(users_path, latest_user, 'AppData', 'Roaming')
-            logger.logger_getad.debug(f"Будет использоваться домашняя директория пользователя: '{latest_user}'")
+            logger.logger_service.debug(f"Будет использоваться домашняя директория пользователя: '{latest_user}'")
             return home_path
 
     except Exception as e:
-        logger.logger_getad.error(f"Ошибка при поиске пути пользователя: {e}")
+        logger.logger_service.error(f"Ошибка при поиске пути пользователя: {e}")
 
     return None
 
@@ -197,4 +197,4 @@ def get_user_appdata(target_folder_path):
 #
 #         return total_space_gb, free_space_gb
 #     except Exception:
-#         logger.logger_getad.error(f"Error: Не удалось получить информацию о диске", exc_info=True)
+#         logger.logger_service.error(f"Error: Не удалось получить информацию о диске", exc_info=True)

@@ -44,8 +44,13 @@ service_data = {
     },
     "notification": {
         "enabled": False,
-        "bot_token": "",
-        "chat_id": ""
+        "authentication": {
+            "encryption": False,
+            "bot_token": "",
+            "chat_id": ""
+        },
+        "max_attempts": 5,
+        "delay": 10
     },
     "fiscals": []
 }

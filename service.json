@@ -3,7 +3,7 @@
         "updater_mode": 1,
         "updater_name": "updater.bat",
         "reboot_file": "reboot.bat",
-        "log_level": "debug",
+        "log_level": "info",
         "log_days": 7
     },
     "validation_fn": {
@@ -19,8 +19,13 @@
     },
     "notification": {
         "enabled": false,
-        "bot_token": "",
-        "chat_id": ""
+        "authentication": {
+            "encryption": false,
+            "bot_token": "",
+            "chat_id": ""
+        },
+        "max_attempts": 5,
+        "delay": 10
     },
     "fiscals": []
 }
