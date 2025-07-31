@@ -29,7 +29,7 @@ def connect_bot(config):
     except Exception:
         logger.logger_service.error("Не удалось дешифровать данные для подключения к боту", exc_info=True)
 
-def request_tg_message(message):
+def request_tg_message(full_message):
     config_name = "service.json"
     config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
 
@@ -46,7 +46,7 @@ def request_tg_message(message):
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
             params = {
                 "chat_id": chat_id,
-                "text": message
+                "text": full_message
             }
 
             response = requests.get(url, params=params)
@@ -59,7 +59,7 @@ def request_tg_message(message):
             # Проверка статуса отправки
             if result.get('ok'):
                 logger.logger_service.info("Уведомление в телеграм успешно отправлено")
-                logger.logger_service.debug(f"\n\n{message}")
+                logger.logger_service.debug(f"\n\n{full_message}")
             else:
                 logger.logger_service.error(f"Не удалось отправить уведомление: {result.get('description')}")
 
@@ -74,7 +74,7 @@ def request_tg_message(message):
                 continue
             logger.logger_service.error("Не удалось сделать запрос к API Telegram", exc_info=True)
 
-def send_tg_delete(serialNumber, delete_days):
+def send_tg_message(message):
     import get_remote
 
     try:
@@ -83,12 +83,12 @@ def send_tg_delete(serialNumber, delete_days):
         anydesk_id = get_remote.get_anydesk_id()
         litemanager_id = get_remote.get_litemanager_id()
 
-        message = (f"Не удалось проверить ФР №{serialNumber} более '{delete_days}' дней, дальнейшая проверка будет отключена до следующего успешного подключения к ФР. \n\n"
+        full_message = (f"{message}\n\n"
                    f"RMS: {url_rms}\n"
                    f"TV: {teamviever_id}\n"
                    f"AD: {anydesk_id}\n"
                    f"LM: {litemanager_id}\n")
 
-        request_tg_message(message)
+        request_tg_message(full_message)
     except Exception:
         logger.logger_service.error("Не удалось сформировать сообщение для отправки уведомления", exc_info=True)

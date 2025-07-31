@@ -1,5 +1,6 @@
 import logger, configs, about
 import json
+import time
 import os
 import shutil
 from comautodetect import get_atol_port_dict, current_time
@@ -332,27 +333,39 @@ def get_atol_data():
     file_name = "connect.json"
     config = configs.read_config_file(about.current_path, file_name, configs.connect_data, create=True)
 
+    try: timeout_to_ip_port = int(config.get("timeout_to_ip_port", 15))
+    except Exception: timeout_to_ip_port = 15
+
+    FR_0 = config.get("atol")[0]["type_connect"]
+    FR_1 = config.get("atol")[1]["type_connect"]
+
+    if FR_0 == 2 and timeout_to_ip_port != 0:
+        time.sleep(timeout_to_ip_port)
+
     try:
-        if config is not None and not config.get("atol")[0]["type_connect"] == 0:
+        if config is not None and not FR_0 == 0:
             port = connect_kkt(fptr, IFptr, 0) # подключаемся к ККТ
             isOpened = status_connect(fptr, port)
             if isOpened == 1:
                 rm_old_date()
                 get_date_kkt(fptr, IFptr, port, installed_version)
-            if config.get("atol")[1]["type_connect"] in [1, 2]:
+            if FR_1 in [1, 2]:
+                if FR_1 == 2 and not timeout_to_ip_port == 0:
+                    time.sleep(timeout_to_ip_port)
+
                 port_2 = connect_kkt(fptr, IFptr, 1)
                 isOpened_2 = status_connect(fptr, port_2)
                 if isOpened_2 == 1:
                     get_date_kkt(fptr, IFptr, port_2, installed_version)
             if isOpened == 0:
                 get_date_non_kkt()
-        elif config is not None and config.get("atol")[0]["type_connect"] == 0:
+        elif config is not None and FR_0 == 0:
             port_number_ad = get_atol_port_dict()
             if not port_number_ad:
                 get_date_non_kkt()
             elif not port_number_ad == {}:
                 logger.logger_getad.info(f"Найдены порты: {port_number_ad}")
-            baud_rate = config.get("atol")[0]["com_baudrate"]
+            baud_rate = config["atol"][0].get("com_baudrate", "115200")
             check_delete = 0
             for port in port_number_ad.values():
                 settings = "{{\"{}\": {}, \"{}\": {}, \"{}\": \"{}\", \"{}\": {}}}".format(

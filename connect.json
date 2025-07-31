@@ -1,18 +1,19 @@
 {
+    "timeout_to_ip_port": 15,
     "atol": [
         {
             "type_connect": 0,
             "com_port": "COM4",
             "com_baudrate": "115200",
-            "ip": "ru.tuna.am",
-            "ip_port": "22579"
+            "ip": "10.127.1.22",
+            "ip_port": "5555",
         },
         {
             "type_connect": 0,
             "com_port": "COM10",
             "com_baudrate": "115200",
-            "ip": "ru.tuna.am",
-            "ip_port": "25531"
+            "ip": "10.127.1.100",
+            "ip_port": "5555"
         }
     ]
 }

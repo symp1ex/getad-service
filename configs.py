@@ -5,6 +5,7 @@ import subprocess
 import about
 
 connect_data = {
+    "timeout_to_ip_port": 15,
     "atol": [
         {
             "type_connect": 0,

@@ -34,7 +34,7 @@ def check_validation_date(config, i):
     except Exception:
         logger.logger_service.error(f"Не удалось вычислить разницу между текущей датой и датой последней валидации ФН.", exc_info=True)
 
-def check_fiscal_register(config, i, file_name):
+def check_fiscal_register(config, i, file_name, notification_enabled, time_sleep):
     # Получаем значения из JSON
     try:
         serial_number = config.get("fiscals")[i]['serialNumber']
@@ -63,7 +63,7 @@ def check_fiscal_register(config, i, file_name):
     if not os.path.exists(logs_dir):
         logger.logger_service.warning(
             f"Путь до папки с логами: '{logs_dir}' не найден, невозможно провести валидацию")
-        disable_check_fr(get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
+        disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
         return "skip"
 
     try:
@@ -76,7 +76,7 @@ def check_fiscal_register(config, i, file_name):
 
         if not log_files:
             logger.logger_service.warning(f"Файл лога, содержащий в названии %{mask_name}% не найден, невозможно провести валидацию")
-            disable_check_fr(get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
+            disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
             return "skip"
 
         logger.logger_service.debug(f"Найденные следущие файлы логов по пути: {logs_dir}")
@@ -94,7 +94,7 @@ def check_fiscal_register(config, i, file_name):
 
         if not recent_files:
             logger.logger_service.warning(f"Не найдено логов, которые обновлялись бы менее '{trigger_days}' дней назад")
-            disable_check_fr(get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
+            disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
             return "skip"
 
         # Находим файл с самой поздней датой изменения
@@ -126,10 +126,16 @@ def check_fiscal_register(config, i, file_name):
                             json_file["vc"] = about.version
                             configs.write_json_file(json_file, json_path)
                             return True
+
+                        logger.logger_service.info(f"Для ФР№{serial_number}, актуальным является ФН№{log_fn}")
+                        if notification_enabled == True:
+                            logger.logger_service.info("Уведомление о не соответствии будет отправлено в ТГ")
+                            message = f"ФР №{serial_number} больше не соответствует ФН №{fn_serial}, актуальный для него ФН №{log_fn}.\nСистема будете перезагружена через ({time_sleep / 3600}) часов."
+                            tg_notification.send_tg_message(message)
                         return False
 
         logger.logger_service.warning(f"Запись об ФР №{serial_number}, не найдена в файле {latest_file}")
-        disable_check_fr(get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
+        disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
         return "skip"
     except Exception:
         logger.logger_service.error(f"Неизвестная ошибка при парсинге лога, мне жаль ;(",
@@ -138,11 +144,20 @@ def check_fiscal_register(config, i, file_name):
 
 def fn_check_process(config_name, folder_name, exe_name, service_instance):
     config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
+
+    target_time = config["validation_fn"].get("target_time", "05:30")
+    time_sleep = get_seconds_until_next_time(target_time)
+    time_sleep_ms = time_sleep * 1000
+
     try: update_enabled = int(config["service"].get("updater_mode", 1))
     except Exception: update_enabled = 1
 
     try: interval_in_hours = int(config["validation_fn"].get("interval", 24))
     except Exception: interval_in_hours = 24
+
+    try: notification_enabled = int(config["notification"].get('enabled', 0))
+    except: notification_enabled = 0
+
 
     interval = 3600000 * interval_in_hours
 
@@ -155,7 +170,7 @@ def fn_check_process(config_name, folder_name, exe_name, service_instance):
                 result_validation = check_validation_date(config, i)
                 if result_validation == False:
                     logger.logger_service.info(f"По логам будет произведено сопоставление ФР и ФН")
-                    result_correlation = check_fiscal_register(config, i, config_name)
+                    result_correlation = check_fiscal_register(config, i, config_name, notification_enabled, time_sleep)
                     if result_correlation == True:
                         update_flag = 1
                     if result_correlation == False:
@@ -171,11 +186,7 @@ def fn_check_process(config_name, folder_name, exe_name, service_instance):
                 configs.subprocess_run(folder_name, exe_name)
             if reboot_flag == 1:
                 reboot_file = config["service"].get("reboot_file", "reboot.bat")
-                target_time = config["validation_fn"].get("target_time", "05:30")
-
-                time_sleep = get_seconds_until_next_time(target_time)
-                time_sleep_ms = time_sleep * 1000
-                logger.logger_service.info(f"Через {time_sleep / 3600} часов будет запущен файл '{reboot_file}'")
+                logger.logger_service.info(f"Через ({time_sleep / 3600}) часов будет запущен файл '{reboot_file}'")
 
                 rc = win32event.WaitForSingleObject(service_instance.hWaitStop, time_sleep_ms)
                 if rc == win32event.WAIT_OBJECT_0:
@@ -232,10 +243,7 @@ def remove_empty_serials_from_file():
         logger.logger_service.error(f"Не удалось очистить конфиг от неактуальных ФР",
                                     exc_info=True)
 
-def disable_check_fr(get_current_time, validation_date, delete_days, serial_number, config, i, file_name):
-    try: notification_enabled = int(config["notification"].get('enabled', 0))
-    except: notification_enabled = 0
-
+def disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number, config, i, file_name):
     difference_in_days = (datetime.strptime(get_current_time, "%Y-%m-%d %H:%M:%S") -
                           datetime.strptime(validation_date, "%Y-%m-%d %H:%M:%S")).days
 
@@ -249,6 +257,8 @@ def disable_check_fr(get_current_time, validation_date, delete_days, serial_numb
             "v_time": ""
         }
         configs.write_json_file(config, file_name)
+
         if notification_enabled == True:
             logger.logger_service.info("Уведомление об удалении будет отправлено в ТГ")
-            tg_notification.send_tg_delete(serial_number, delete_days)
+            message = f"Не удалось проверить ФР №{serial_number} более '{delete_days}' дней, дальнейшая проверка будет отключена до следующего успешного подключения к ФР."
+            tg_notification.send_tg_message(message)
