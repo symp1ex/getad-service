@@ -181,10 +181,6 @@ def fn_check_process(config_name, folder_name, exe_name, service_instance):
             remove_empty_serials_from_file()
 
             if update_flag == 1:
-                if update_enabled == 2:
-                    config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
-                    config["service"]["updater_mode"] = 333
-                    configs.write_json_file(config, config_name)
                 configs.subprocess_run(folder_name, exe_name)
             if reboot_flag == 1:
                 reboot_file = config["service"].get("reboot_file", "reboot.bat")

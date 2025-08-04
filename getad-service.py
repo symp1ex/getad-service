@@ -14,7 +14,7 @@ import about
 class Service(win32serviceutil.ServiceFramework):
     _svc_name_ = "MH_Getad"  # Название службы
     _svc_display_name_ = "MH_Getad"  # Отображаемое имя службы
-    _svc_description_ = "Check Fiscal Service"  # Описание службы
+    _svc_description_ = "MyHoreca Check Fiscal Service"  # Описание службы
     _svc_start_type_ = win32service.SERVICE_AUTO_START  # Автозапуск
 
     def __init__(self, args):
@@ -54,18 +54,7 @@ class Service(win32serviceutil.ServiceFramework):
         except Exception: update_enabled = 1
 
         try:
-            if update_enabled == 2:
-                atol.get_atol_data()
-                config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
-                config["service"]["updater_mode"] = 333
-                configs.write_json_file(config, config_name)
-                configs.subprocess_run(folder_name, exe_name)
-            elif update_enabled == 333:
-                config["service"]["updater_mode"] = 2
-                configs.write_json_file(config, config_name)
-                if validation == 1:
-                    fn_check.fn_check_process(config_name, folder_name, exe_name, self)
-            elif update_enabled == 1:
+            if update_enabled == 1:
                 atol.get_atol_data()
                 configs.subprocess_run(folder_name, exe_name)
                 if validation == 1:
