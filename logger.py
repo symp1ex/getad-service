@@ -31,8 +31,11 @@ def logger(file_name, with_console=False):
         "CRITICAL": logging.CRITICAL
     }
 
-    config_name = "service.json"
-    config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
+    try:
+        config_name = "service.json"
+        config = configs.read_config_file(about.current_path, config_name, configs.service_data, create=True)
+    except:
+        pass
 
     try: days = int(config["service"].get("log_days", 7))
     except Exception: days = 7
@@ -43,7 +46,9 @@ def logger(file_name, with_console=False):
     if not os.path.exists(log_folder):
         os.makedirs(log_folder)
 
-    log_level = config['service'].get('log_level', 'INFO').upper()  # INFO будет значением по умолчанию
+    try: log_level = config['service'].get('log_level', 'INFO').upper()  # INFO будет значением по умолчанию
+    except: log_level = "INFO"
+
     if log_level not in LOG_LEVELS:
         log_level = "INFO"
 
