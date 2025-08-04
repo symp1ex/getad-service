@@ -34,7 +34,7 @@ def check_validation_date(config, i):
     except Exception:
         logger.logger_service.error(f"Не удалось вычислить разницу между текущей датой и датой последней валидации ФН.", exc_info=True)
 
-def check_fiscal_register(config, i, file_name, notification_enabled, time_sleep):
+def check_fiscal_register(config, i, file_name, notification_enabled, hh, mm):
     # Получаем значения из JSON
     try:
         serial_number = config.get("fiscals")[i]['serialNumber']
@@ -130,7 +130,7 @@ def check_fiscal_register(config, i, file_name, notification_enabled, time_sleep
                         logger.logger_service.info(f"Для ФР№{serial_number}, актуальным является ФН№{log_fn}")
                         if notification_enabled == True:
                             logger.logger_service.info("Уведомление о не соответствии будет отправлено в ТГ")
-                            message = f"ФР №{serial_number} больше не соответствует ФН №{fn_serial}, актуальный для него ФН №{log_fn}.\nСистема будете перезагружена через ({time_sleep / 3600}) часов."
+                            message = f"ФР №{serial_number} больше не соответствует ФН №{fn_serial}, актуальный для него ФН №{log_fn}.\nСистема будете перезагружена через {hh}ч. {mm}м."
                             tg_notification.send_tg_message(message)
                         return False
 
@@ -148,12 +148,14 @@ def fn_check_process(config_name, folder_name, exe_name, service_instance):
     target_time = config["validation_fn"].get("target_time", "05:30")
     time_sleep = get_seconds_until_next_time(target_time)
     time_sleep_ms = time_sleep * 1000
+    hh = int(time_sleep / 3600)
+    mm = int((time_sleep % 3600) / 60)
 
     try: update_enabled = int(config["service"].get("updater_mode", 1))
     except Exception: update_enabled = 1
 
-    try: interval_in_hours = int(config["validation_fn"].get("interval", 24))
-    except Exception: interval_in_hours = 24
+    try: interval_in_hours = int(config["validation_fn"].get("interval", 12))
+    except Exception: interval_in_hours = 12
 
     try: notification_enabled = int(config["notification"].get('enabled', 0))
     except: notification_enabled = 0
@@ -170,7 +172,7 @@ def fn_check_process(config_name, folder_name, exe_name, service_instance):
                 result_validation = check_validation_date(config, i)
                 if result_validation == False:
                     logger.logger_service.info(f"По логам будет произведено сопоставление ФР и ФН")
-                    result_correlation = check_fiscal_register(config, i, config_name, notification_enabled, time_sleep)
+                    result_correlation = check_fiscal_register(config, i, config_name, notification_enabled, hh, mm)
                     if result_correlation == True:
                         update_flag = 1
                     if result_correlation == False:
@@ -186,7 +188,7 @@ def fn_check_process(config_name, folder_name, exe_name, service_instance):
                 configs.subprocess_run(folder_name, exe_name)
             if reboot_flag == 1:
                 reboot_file = config["service"].get("reboot_file", "reboot.bat")
-                logger.logger_service.info(f"Через ({time_sleep / 3600}) часов будет запущен файл '{reboot_file}'")
+                logger.logger_service.info(f"Через {hh}ч.{mm}м. будет запущен файл '{reboot_file}'")
 
                 rc = win32event.WaitForSingleObject(service_instance.hWaitStop, time_sleep_ms)
                 if rc == win32event.WAIT_OBJECT_0:
