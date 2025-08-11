@@ -98,13 +98,3 @@ def logger(file_name, with_console=False):
 
 logger_service = logger(f"service", with_console=True)
 logger_getad = logger(f"getad", with_console=True)
-
-
-
-# logger.debug("сообщение отладки")
-# logger.info("информационное сообщение")
-# logger.warning("предупреждение")
-# logger.error("ошибка")
-# logger.critical("критическое сообщение")
-#logger.error("Сообщение с включенным стеком", exc_info=True)
-# logger.exception("стек исключений")

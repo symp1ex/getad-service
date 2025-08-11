@@ -23,13 +23,13 @@ def check_validation_date(config, i):
         try: trigger_days = int(config["validation_fn"].get("trigger_days", 3))
         except Exception: trigger_days = 3
 
-        logger.logger_service.info(f"Будет произведена проверка валидации для ФР №{serialNumber}")
+        logger.logger_service.info(f"Будет произведена валидация ФР №{serialNumber}")
         logger.logger_service.debug(f"Дата последней валидации: {validation_date}")
         logger.logger_service.debug(f"Количество дней, после которого валидация считается не пройденной: {trigger_days}")
 
         difference_in_days = (datetime.strptime(get_current_time, "%Y-%m-%d %H:%M:%S") - datetime.strptime(validation_date, "%Y-%m-%d %H:%M:%S")).days
         valid = difference_in_days < trigger_days
-        logger.logger_service.info(f"Результат проверки валидации для ФР №{serialNumber}: '{valid}'")
+        logger.logger_service.info(f"Результат валидации ФР №{serialNumber}: '{valid}'")
         return valid
     except Exception:
         logger.logger_service.error(f"Не удалось вычислить разницу между текущей датой и датой последней валидации ФН.", exc_info=True)
