@@ -65,50 +65,50 @@
 ### Команды управления службой
 ```bash
 # Установка службы
-python getad-service.py install
+python getadsc.py install
 
 # Запуск службы
-python getad-service.py start
+python getadsc.py start
 
 # Остановка службы
-python getad-service.py stop
+python getadsc.py stop
 
 # Удаление службы
-python getad-service.py remove
+python getadsc.py remove
 
 # Запуск в debug-режиме
-python getad-service.py debug
+python getadsc.py debug
 
 # Пользователь
-python getad-service.py --username domain\user
+python getadsc.py --username domain\user
 
 #Для установки с автозапуском
-python getad-service.py --startup auto install 
+python getadsc.py --startup auto install 
 ```
 <details>
 <summary>Тоже самое работает если служба собрана в <b>.exe-файл</b></summary>
   
 ```bash
 # Установка службы
-getad-service.exe install
+getadsc.exe install
 
 # Запуск службы
-getad-service.exe start
+getadsc.exe start
 
 # Остановка службы
-getad-service.exe stop
+getadsc.exe stop
 
 # Удаление службы
-getad-service.exe remove
+getadsc.exe remove
 
 # Запуск в debug-режиме
-getad-service.exe debug
+getadsc.exe debug
 
 # Пользователь
-getad-service.exe --username domain\user
+getadsc.exe --username domain\user
 
 #Для установки с автозапуском
-getad-service.exe --startup auto install 
+getadsc.exe --startup auto install 
 ```
 
 </details>
@@ -197,7 +197,7 @@ getad-service.exe --startup auto install
 ```
 
 Параметры службы:
-- `updater_mode`: выключение/включение отправки данных\автообновления (1 - вкл, 0 - выкл)
+- `updater_mode`: выключение\включение отправки данных\автообновления (1 - вкл, 0 - выкл)
 - `updater_name`: имя файла скрипта отправки данных (любой .exe или .bat файл)
 - `reboot_file`: имя файла для перезагрузки
 - `log_level`: уровень логирования
@@ -267,7 +267,7 @@ current_path = os.path.dirname(sys.executable)
 
 ### 2. При сборке при помощи **`PyInstaller`**, необходимо явно указать некоторые импорты. Команда будет выглядеть так:
 ```bash
-py -3.8 -m PyInstaller --hidden-import win32timezone --hidden-import win32serviceutil --hidden-import cryptography.fernet --hidden-import serial.tools.list_ports --hidden-import win32security --hidden-import win32ts --hidden-import win32service --hidden-import win32event --hidden-import servicemanager --hidden-import socket --hidden-import pywintypes --hidden-import win32api --onefile --noconsole --icon=favicon.ico getad-service.py
+py -3.8 -m PyInstaller --hidden-import win32timezone --hidden-import win32serviceutil --hidden-import cryptography.fernet --hidden-import serial.tools.list_ports --hidden-import win32security --hidden-import win32ts --hidden-import win32service --hidden-import win32event --hidden-import servicemanager --hidden-import socket --hidden-import pywintypes --hidden-import win32api --onefile --noconsole --icon=favicon.ico getadsc.py
 ```
 ## Отправка уведомлений в Telegram
 
@@ -307,5 +307,6 @@ data_to_encrypt2 = "telegram_chat_id"
 </details>
 
 Там же лежит **`gen-key.py`**, запустив который, можно сгенерировать свой уникальный ключ.
+
 
 
