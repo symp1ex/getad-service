@@ -18,7 +18,6 @@ def get_driver_version(file_path):
         return '.'.join(map(str, version))
     except Exception:
         service.logger.logger_getad.error(f"Не удалось проверить версию исходного файла", exc_info=True)
-        os._exit(1)
 
 def file_exists_in_root(filename):
     try:
