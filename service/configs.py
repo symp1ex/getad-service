@@ -3,7 +3,8 @@ import about
 import json
 import os
 import subprocess
-import win32com.client
+import wmi
+import pythoncom
 
 connect_data = {
     "timeout_to_ip_port": 15,
@@ -134,18 +135,28 @@ def subprocess_run(folder_name, file_name):
     except Exception:
         service.logger.logger_service.error(f"Не удалось запустить '{exe_path}'", exc_info=True)
 
+
 def check_procces(file_name):
     service.logger.logger_service.debug(f"Проверяем актвивность процесса '{file_name}'")
     try:
-        WMI = win32com.client.GetObject('winmgmts:')
-        processes = WMI.InstancesOf('Win32_Process')
+        # Инициализируем COM для текущего потока
+        pythoncom.CoInitialize()
 
-        for process in processes:
-            if process.Name.lower() == file_name.lower():
-                service.logger.logger_service.debug(f"Процесс '{file_name}' активен")
-                return True
-        service.logger.logger_service.debug(f"Процесс '{file_name}' неактивен")
-        return False
+        try:
+            c = wmi.WMI()
+            # Ищем процесс по имени
+            for process in c.Win32_Process():
+                if process.Name.lower() == file_name.lower():
+                    service.logger.logger_service.debug(f"Процесс '{file_name}' активен")
+                    return True
+
+            service.logger.logger_service.debug(f"Процесс '{file_name}' неактивен")
+            return False
+
+        finally:
+            # Освобождаем COM
+            pythoncom.CoUninitialize()
+
     except Exception:
         service.logger.logger_service.error(f"Не удалось отследить состояние процесса '{file_name}'", exc_info=True)
         return False

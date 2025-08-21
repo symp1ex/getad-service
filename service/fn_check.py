@@ -146,10 +146,6 @@ def fn_check_process(config_name, folder_name, exe_name, service_instance):
     config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data, create=True)
 
     target_time = config["validation_fn"].get("target_time", "05:30")
-    time_sleep = get_seconds_until_next_time(target_time)
-    time_sleep_ms = time_sleep * 1000
-    hh = int(time_sleep / 3600)
-    mm = int((time_sleep % 3600) / 60)
 
     try: interval_in_hours = int(config["validation_fn"].get("interval", 12))
     except Exception: interval_in_hours = 12
@@ -162,34 +158,37 @@ def fn_check_process(config_name, folder_name, exe_name, service_instance):
 
     try:
         while service_instance.is_running:
-            update_flag = 0
             reboot_flag = 0
 
             for i in range(len(config.get("fiscals"))):
                 result_validation = check_validation_date(config, i)
                 if result_validation == False:
                     service.logger.logger_service.info(f"По логам будет произведено сопоставление ФР и ФН")
+
+                    time_sleep = get_seconds_until_next_time(target_time)
+                    time_sleep_ms = time_sleep * 1000
+                    hh = int(time_sleep / 3600)
+                    mm = int((time_sleep % 3600) / 60)
+
                     result_correlation = check_fiscal_register(config, i, config_name, notification_enabled, hh, mm)
-                    if result_correlation == True:
-                        update_flag = 1
                     if result_correlation == False:
                         reboot_flag = 1
 
+            service.configs.subprocess_run(folder_name, exe_name)
             remove_empty_serials_from_file()
 
-            if update_flag == 1:
-                service.configs.subprocess_run(folder_name, exe_name)
             if reboot_flag == 1:
                 reboot_file = config["service"].get("reboot_file", "reboot.bat")
-                service.logger.logger_service.info(f"Через {hh}ч.{mm}м. будет запущен файл '{reboot_file}'")
 
-                rc = win32event.WaitForSingleObject(service_instance.hWaitStop, time_sleep_ms)
-                if rc == win32event.WAIT_OBJECT_0:
-                    break
+                if target_time == 0:
+                    service.configs.subprocess_run("", reboot_file)
+                else:
+                    service.logger.logger_service.info(f"Через {hh}ч.{mm}м. будет запущен файл '{reboot_file}'")
 
-                service.logger.logger_service.info(f"Будет запущен файл '{reboot_file}'")
-                service.configs.subprocess_run("", reboot_file)
-
+                    rc = win32event.WaitForSingleObject(service_instance.hWaitStop, time_sleep_ms)
+                    if rc == win32event.WAIT_OBJECT_0:
+                        break
+                    service.configs.subprocess_run("", reboot_file)
             service.logger.logger_service.info(f"До следующей проверки осталось {interval_in_hours} часов")
             rc = win32event.WaitForSingleObject(service_instance.hWaitStop, interval)
             if rc == win32event.WAIT_OBJECT_0:
@@ -207,8 +206,12 @@ def get_seconds_until_next_time(target_time):
         # Создаем дату на следующий день
         next_day = current + timedelta(days=1)
 
-        # Разбиваем целевое время на часы и минуты
-        target_hour, target_minute = map(int, target_time.split(':'))
+        try:
+            # Разбиваем целевое время на часы и минуты
+            target_hour, target_minute = map(int, target_time.split(':'))
+        except Exception:
+            target_hour = 4
+            target_minute = 30
 
         # Создаем новую дату с заменой времени на целевое
         target_datetime = next_day.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
