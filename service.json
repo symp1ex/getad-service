@@ -2,7 +2,7 @@
     "service": {
         "updater_mode": 1,
         "updater_name": "updater.bat",
-        "reboot_file": "reboot.bat",
+        "reboot_file": "scripts\\reboot.bat",
         "log_level": "info",
         "log_days": 7
     },
@@ -32,4 +32,5 @@
         "delay": 10
     },
     "fiscals": []
+
 }
