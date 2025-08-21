@@ -17,6 +17,11 @@
         "serialNumber_key": "serialNumber=",
         "fnNumber_key": "fnNumber="
     },
+	"shtrihscanner": {
+        "enabled": true,
+        "exe_name": "shtrihscanner.exe",
+        "timeout": 15
+    },
     "notification": {
         "enabled": false,
         "authentication": {
