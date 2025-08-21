@@ -23,7 +23,10 @@ class ShtrihData():
         try: type_connect_atol1 = int(self.config_connect["atol"][1].get("type_connect", 0))
         except Exception: type_connect_atol1 = 0
 
-        if type_connect_atol0 == 2 and type_connect_atol1 == 2:
+        if type_connect_atol0 == 2 or type_connect_atol1 == 2:
+            pass
+        else:
+            service.logger.logger_service.debug(f"Работа службы будет продолжена через ({timeout}) секунд")
             time.sleep(timeout)
 
         service.configs.subprocess_run("", self.exe_name)
