@@ -46,8 +46,7 @@ service_data = {
     },
     "shtrihscanner": {
         "enabled": True,
-        "exe_name": "shtrihscanner.exe",
-        "timeout": 15
+        "exe_name": "shtrihscanner.exe"
     },
     "notification": {
         "enabled": False,
