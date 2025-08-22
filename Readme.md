@@ -79,12 +79,36 @@ python getadsc.py remove
 # Запуск в debug-режиме
 python getadsc.py debug
 
-# Пользователь
-python getadsc.py --username domain\user
+# Перезапуск
+python getadsc.py restart
+
+# Обновление настроек
+python getadsc.py [options] update
 
 #Для установки с автозапуском
-python getadsc.py --startup auto install 
+python getadsc.py --startup auto install
 ```
+<details>
+<summary>Опции для запуска только с <b>install</b> или <b>update</b></summary>
+  
+```bash
+Options for 'install' and 'update' commands only:
+ --username domain\username : The Username the service is to run under
+ --password password : The password for the username
+ --startup [manual|auto|disabled|delayed] : How the service starts, default = manual
+ --interactive : Allow the service to interact with the desktop.
+ --perfmonini file: .ini file to use for registering performance monitor data
+ --perfmondll file: .dll file to use when querying the service for
+   performance data, default = perfmondata.dll
+Options for 'start' and 'stop' commands only:
+ --wait seconds: Wait for the service to actually start or stop.
+                 If you specify --wait with the 'stop' option, the service
+                 and all dependent services will be stopped, each waiting
+                 the specified period.
+```
+
+</details>
+				 
 <details>
 <summary>Тоже самое работает если служба собрана в <b>.exe-файл</b></summary>
   
@@ -104,8 +128,8 @@ getadsc.exe remove
 # Запуск в debug-режиме
 getadsc.exe debug
 
-# Пользователь
-getadsc.exe --username domain\user
+# Обновление настроек
+getadsc.exe [options] update
 
 #Для установки с автозапуском
 getadsc.exe --startup auto install 
@@ -183,6 +207,10 @@ getadsc.exe --startup auto install
         "serialNumber_key": "serialNumber=",
         "fnNumber_key": "fnNumber="
     },
+    "shtrihscanner": {
+        "enabled": true,
+        "exe_name": "shtrihscanner.exe"
+    },
     "notification": {
         "enabled": false,
         "authentication": {
@@ -214,6 +242,10 @@ getadsc.exe --startup auto install
 - `serialNumber_key`: ключ серийного номера ФР в логе
 - `fnNumber_key`: ключ номера ФН в логе
 
+Параметры плагина **`shtrihscanner`**:
+- `enabled`: запуск исполняемого файла плагина при работе службы
+- `exe_name`: имя\путь до запускаемого файла
+
 Параметры уведомлений:
 - `enabled`: включение уведомлений
 - `encryption`: шифрование данных для подключения боту
@@ -229,6 +261,13 @@ getadsc.exe --startup auto install
 Можно взять тут: https://github.com/symp1ex/ftp-updater
 
 Но вообще это может быть любой скрипт, например в виде **`.bat-файла`**. Важно положить его в папку **`updater`** и прописать правильное имя файла в **`service.json`**
+
+## shtrihscanner
+При включении будет запущен любой исполняемый файл или скрипт указанный в конфиге. Ожидается что он сохранит полученные от Штриха данные в папку **`date`** в таком же формате, в каком это делает Атол (пример есть в описании).
+
+В архиве с релизом уже лежит файл, специального написанного под это плагина. Данные по адресу rms-сервера и удалённым подключениям плагин берёт из **`.json`**, создаваемого службой при запуске. 
+
+Позже тут появится ссылка на исходники.
 
 ## Сборка
 ### 1. Необходимо сделать замену переменной **`current_path`** в файле **`about.py`**
@@ -267,7 +306,7 @@ current_path = os.path.dirname(sys.executable)
 
 ### 2. При сборке при помощи **`PyInstaller`**, необходимо явно указать некоторые импорты. Команда будет выглядеть так:
 ```bash
-py -3.8 -m PyInstaller --hidden-import win32timezone --hidden-import win32serviceutil --hidden-import cryptography.fernet --hidden-import serial.tools.list_ports --hidden-import win32security --hidden-import win32ts --hidden-import win32service --hidden-import win32event --hidden-import servicemanager --hidden-import socket --hidden-import pywintypes --hidden-import win32api --onefile --noconsole --icon=favicon.ico getadsc.py
+py -3.8 -m PyInstaller --hidden-import pythoncom --hidden-import win32timezone --hidden-import win32serviceutil --hidden-import cryptography.fernet --hidden-import serial.tools.list_ports --hidden-import win32security --hidden-import win32ts --hidden-import win32service --hidden-import win32event --hidden-import servicemanager --hidden-import socket --hidden-import pywintypes --hidden-import win32api --onefile --noconsole --icon=favicon.ico getadsc.py
 ```
 ## Отправка уведомлений в Telegram
 
@@ -307,6 +346,3 @@ data_to_encrypt2 = "telegram_chat_id"
 </details>
 
 Там же лежит **`gen-key.py`**, запустив который, можно сгенерировать свой уникальный ключ.
-
-
-
