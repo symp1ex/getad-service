@@ -30,7 +30,7 @@ service_data = {
     "service": {
         "updater_mode": 1,
         "updater_name": "updater.exe",
-        "reboot_file": "reboot.bat",
+        "reboot_file": "scripts\\reboot.bat",
         "log_level": "info",
         "log_days": 7
     },
@@ -160,6 +160,7 @@ def check_procces(file_name):
     except Exception:
         service.logger.logger_service.error(f"Не удалось отследить состояние процесса '{file_name}'", exc_info=True)
         return False
+
 
 
 
