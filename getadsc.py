@@ -63,8 +63,6 @@ class Service(win32serviceutil.ServiceFramework):
                 if shtrihscanner.enbaled == 1:
                     shtrihscanner.run_shtrihscanner()
 
-                service.configs.subprocess_run(folder_name, exe_name)
-
                 if validation == 1:
                     service.fn_check.fn_check_process(config_name, folder_name, exe_name, self)
             else:
