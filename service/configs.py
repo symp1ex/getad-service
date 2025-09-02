@@ -30,16 +30,17 @@ service_data = {
     "service": {
         "updater_mode": 1,
         "updater_name": "updater.exe",
-        "reboot_file": "scripts\\reboot.bat",
+        "reboot_file": "reboot.bat",
         "log_level": "info",
         "log_days": 7
     },
     "validation_fn": {
         "enabled": True,
-        "interval": 12,
-        "trigger_days": 3,
+        "forced": False,
+        "interval": 8,
+        "trigger_days": 2,
         "target_time": "05:30",
-        "delete_days": 21,
+        "delete_days": 14,
         "logs_mask_name": "AtolFiscalRegister",
         "logs_dir": "iiko",
         "serialNumber_key": "serialNumber=",
@@ -58,8 +59,7 @@ service_data = {
         },
         "max_attempts": 5,
         "delay": 10
-    },
-    "fiscals": []
+    }
 }
 
 def write_json_file(config, file_name):
@@ -70,7 +70,7 @@ def write_json_file(config, file_name):
         service.logger.logger_service.info(f"Данные записаны в '{file_name}'")
         service.logger.logger_service.debug(config)
     except Exception:
-        service.logger.logger_service.error(f"Не удалось записать данные в '{file_path}'.")
+        service.logger.logger_service.error(f"Не удалось записать данные в '{file_path}'.", exc_info=True)
 
 def read_config_file(folder_name, file_name, config_data, create=False):
     json_file = os.path.join(folder_name, file_name)
@@ -94,20 +94,22 @@ def create_json_file(folder_name, file_name, data):
             os.makedirs(folder_name)
         write_json_file(data, json_file)
     except Exception:
-        service.logger.logger_service.error(f"Не удалось записать данные при создании файла: '{json_file}'", exc_info=True)
+        service.logger.logger_service.error(f"Не удалось записать данные при создании файла: "
+                                            f"'{json_file}'", exc_info=True)
 
-def update_correlation_fiscals(serialNumber, fn_serial, get_current_time):
-    service_file_name = "service.json"
+def update_correlation_fiscals(serialNumber, fn_serial, get_current_time, model_kkt):
+    service_file_path = os.path.join("_resources", "fiscals.json")
     service_json_path = about.current_path
 
     try:
-        service_data = read_config_file(service_json_path, service_file_name, "", create=False)
+        service_data = read_config_file(service_json_path, service_file_path, {model_kkt: []}, create=True)
 
         # Проверка наличия ключа "fiscals" и добавление новой записи
-        if "fiscals" not in service_data:
-            service_data["fiscals"] = []
+        if model_kkt not in service_data:
+            service_data[model_kkt] = []
 
-        existing_entry = next((item for item in service_data["fiscals"] if item["serialNumber"] == serialNumber), None)
+        existing_entry = next((item for item in service_data[model_kkt] if item["serialNumber"] == serialNumber),
+                              None)
 
         if existing_entry:
             # Обновление существующего элемента
@@ -115,13 +117,13 @@ def update_correlation_fiscals(serialNumber, fn_serial, get_current_time):
             existing_entry["v_time"] = get_current_time
         else:
             # Добавление нового элемента
-            service_data["fiscals"].append({
+            service_data[model_kkt].append({
                 "serialNumber": serialNumber,
                 "fn_serial": fn_serial,
                 "v_time": get_current_time
             })
         # Запись обновленного содержимого обратно в service.json
-        write_json_file(service_data, "service.json")
+        write_json_file(service_data, service_file_path)
     except Exception:
         service.logger.logger_service.error(f"Не удалось обновить '{service_json_path}'", exc_info=True)
 
@@ -129,8 +131,10 @@ def subprocess_run(folder_name, file_name):
     exe_path = os.path.join(about.current_path, folder_name, file_name)
     service.logger.logger_service.info(f"Будет отдана команда на запуск '{exe_path}'")
     try:
+        # получаем абсолютный путь к основному файлу скрипта sys.argv[0], а затем с помощью
+        # os.path.dirname() извлекаем путь к директории, содержащей основной файл
         working_directory = os.path.join(about.current_path,
-                                         folder_name)  # получаем абсолютный путь к основному файлу скрипта sys.argv[0], а затем с помощью os.path.dirname() извлекаем путь к директории, содержащей основной файл
+                                         folder_name)
         subprocess.Popen(exe_path, cwd=working_directory)
     except Exception:
         service.logger.logger_service.error(f"Не удалось запустить '{exe_path}'", exc_info=True)
@@ -160,7 +164,6 @@ def check_procces(file_name):
     except Exception:
         service.logger.logger_service.error(f"Не удалось отследить состояние процесса '{file_name}'", exc_info=True)
         return False
-
 
 
 

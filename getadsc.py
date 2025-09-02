@@ -12,10 +12,30 @@ import socket
 import sys
 import os
 
+def run_without_arguments():
+    try:
+        service.logger.logger_service.debug("Не было получено ни одного аргумента запуска")
+        service.logger.logger_service.info("Произведён запуск исполняемого файла не от имени службы")
+        config_name = "service.json"
+        folder_name = "updater"
+        config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data,
+                                                  create=True)
+        exe_name = config["service"].get("updater_name", "updater.exe")
+
+        try: update_enabled = int(config["service"].get("updater_mode", 1))
+        except Exception: update_enabled = 1
+
+        getdata.atol.atol.get_atol_data()
+
+        if update_enabled == 1:
+            service.configs.subprocess_run(folder_name, exe_name)
+    except AttributeError:
+        pass
+
 class Service(win32serviceutil.ServiceFramework):
     _svc_name_ = "MH_Getad"  # Название службы
     _svc_display_name_ = "MH_Getad"  # Отображаемое имя службы
-    _svc_description_ = "MyHoreca Check Fiscal Service"  # Описание службы
+    _svc_description_ = "Check Fiscal Service"  # Описание службы
     _svc_start_type_ = win32service.SERVICE_AUTO_START  # Автозапуск
 
     def __init__(self, args):
@@ -47,7 +67,8 @@ class Service(win32serviceutil.ServiceFramework):
 
         config_name = "service.json"
         folder_name = "updater"
-        config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data, create=True)
+        config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data,
+                                                  create=True)
         exe_name = config["service"].get("updater_name", "updater.exe")
 
         try: validation = int(config.get("validation_fn").get("enabled", 1))
@@ -60,26 +81,25 @@ class Service(win32serviceutil.ServiceFramework):
             if update_enabled == 1:
                 getdata.atol.atol.get_atol_data()
 
-                if shtrihscanner.enbaled == 1:
-                    shtrihscanner.run_shtrihscanner()
+                if shtrihscanner.enabled == 1:
+                    shtrihscanner.run(self)
 
                 if validation == 1:
                     service.fn_check.fn_check_process(config_name, folder_name, exe_name, self)
             else:
                 getdata.atol.atol.get_atol_data()
 
-                if shtrihscanner.enbaled == 1:
-                    shtrihscanner.run_shtrihscanner()
+                if shtrihscanner.enabled == 1:
+                    shtrihscanner.run(self)
 
                 self.SvcStop()
         except Exception:
             service.logger.logger_service.critical(f"Запуск основного потока службы завершился с ошибкой", exc_info=True)
             os._exit(1)
 
+
 if __name__ == '__main__':
     if len(sys.argv) == 1:
-        servicemanager.Initialize()
-        servicemanager.PrepareToHostSingle(Service)
-        servicemanager.StartServiceCtrlDispatcher()
+        run_without_arguments()
     else:
         win32serviceutil.HandleCommandLine(Service)

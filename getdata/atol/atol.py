@@ -256,7 +256,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
     except Exception:
         service.logger.logger_getad.error(f"Не удалось сохранить информацию от ККТ", exc_info=True)
 
-    service.configs.update_correlation_fiscals(serialNumber, fn_serial, get_current_time)
+    service.configs.update_correlation_fiscals(serialNumber, fn_serial, get_current_time, "atol")
 
 def get_date_non_kkt():
     hostname, url_rms, teamviever_id, anydesk_id, litemanager_id = get_remote()

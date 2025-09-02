@@ -9,11 +9,11 @@ import os
 import win32event
 from datetime import datetime, timedelta
 
-def check_validation_date(config, i):
+def check_validation_date(config, fiscals_json, i):
     try:
         try:
-            serialNumber = config.get("fiscals")[i]["serialNumber"]
-            validation_date = config.get("fiscals")[i]["v_time"]
+            serialNumber = fiscals_json.get("atol")[i]["serialNumber"]
+            validation_date = fiscals_json.get("atol")[i]["v_time"]
         except Exception:
             service.logger.logger_service.error(f"Не удалось получить значение запрашиваемого ключа из конфига",
                                         exc_info=True)
@@ -25,21 +25,24 @@ def check_validation_date(config, i):
 
         service.logger.logger_service.info(f"Будет произведена валидация ФР №{serialNumber}")
         service.logger.logger_service.debug(f"Дата последней валидации: {validation_date}")
-        service.logger.logger_service.debug(f"Количество дней, после которого валидация считается не пройденной: {trigger_days}")
+        service.logger.logger_service.debug(f"Количество дней, после которого валидация считается не пройденной: "
+                                            f"{trigger_days}")
 
-        difference_in_days = (datetime.strptime(get_current_time, "%Y-%m-%d %H:%M:%S") - datetime.strptime(validation_date, "%Y-%m-%d %H:%M:%S")).days
+        difference_in_days = (datetime.strptime(get_current_time, "%Y-%m-%d %H:%M:%S") -
+                              datetime.strptime(validation_date, "%Y-%m-%d %H:%M:%S")).days
         valid = difference_in_days < trigger_days
         service.logger.logger_service.info(f"Результат валидации ФР №{serialNumber}: '{valid}'")
         return valid
     except Exception:
-        service.logger.logger_service.error(f"Не удалось вычислить разницу между текущей датой и датой последней валидации ФН.", exc_info=True)
+        service.logger.logger_service.error(f"Не удалось вычислить разницу между текущей датой и датой последней "
+                                            f"валидации ФН.", exc_info=True)
 
-def check_fiscal_register(config, i, file_name, notification_enabled, hh, mm):
+def check_fiscal_register(config, fiscals_json, i, file_name, fiscals_json_name, notification_enabled, hh, mm):
     # Получаем значения из JSON
     try:
-        serial_number = config.get("fiscals")[i]['serialNumber']
-        fn_serial = config.get("fiscals")[i]['fn_serial']
-        validation_date = config.get("fiscals")[i]["v_time"]
+        serial_number = fiscals_json.get("atol")[i]['serialNumber']
+        fn_serial = fiscals_json.get("atol")[i]['fn_serial']
+        validation_date = fiscals_json.get("atol")[i]["v_time"]
     except Exception:
         service.logger.logger_service.error(f"Не удалось получить значение запрашиваемого ключа из конфига",
                                     exc_info=True)
@@ -63,7 +66,8 @@ def check_fiscal_register(config, i, file_name, notification_enabled, hh, mm):
     if not os.path.exists(logs_dir):
         service.logger.logger_service.warning(
             f"Путь до папки с логами: '{logs_dir}' не найден, невозможно провести валидацию")
-        disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
+        disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number,
+                         fiscals_json, i, fiscals_json_name)
         return "skip"
 
     try:
@@ -75,8 +79,10 @@ def check_fiscal_register(config, i, file_name, notification_enabled, hh, mm):
         ]
 
         if not log_files:
-            service.logger.logger_service.warning(f"Файл лога, содержащий в названии %{mask_name}% не найден, невозможно провести валидацию")
-            disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
+            service.logger.logger_service.warning(f"Файл лога, содержащий в названии %{mask_name}% не найден, "
+                                                  f"невозможно провести валидацию")
+            disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number,
+                             fiscals_json, i, fiscals_json_name)
             return "skip"
 
         service.logger.logger_service.debug(f"Найденные следущие файлы логов по пути: {logs_dir}")
@@ -93,8 +99,10 @@ def check_fiscal_register(config, i, file_name, notification_enabled, hh, mm):
         ]
 
         if not recent_files:
-            service.logger.logger_service.warning(f"Не найдено логов, которые обновлялись бы менее '{trigger_days}' дней назад")
-            disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
+            service.logger.logger_service.warning(f"Не найдено логов, которые обновлялись бы менее '{trigger_days}' "
+                                                  f"дней назад")
+            disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number,
+                             fiscals_json, i, fiscals_json_name)
             return "skip"
 
         # Находим файл с самой поздней датой изменения
@@ -117,25 +125,29 @@ def check_fiscal_register(config, i, file_name, notification_enabled, hh, mm):
                         if log_fn == fn_serial:
                             json_name = f"{serial_number}.json"
                             json_path = os.path.join(about.current_path, "date", json_name)
-                            json_file = service.configs.read_config_file(about.current_path, json_path, "", create=False)
+                            json_file = service.configs.read_config_file(about.current_path, json_path, "",
+                                                                         create=False)
 
-                            config["fiscals"][i]["v_time"] = get_current_time
-                            service.configs.write_json_file(config, file_name)
+                            fiscals_json["atol"][i]["v_time"] = get_current_time
+                            service.configs.write_json_file(fiscals_json, fiscals_json_name)
 
                             json_file["v_time"] = get_current_time
                             json_file["vc"] = about.version
                             service.configs.write_json_file(json_file, json_path)
                             return True
 
-                        service.logger.logger_service.info(f"Для ФР№{serial_number}, актуальным является ФН№{log_fn}")
+                        service.logger.logger_service.info(f"Для ФР№{serial_number}, актуальным является ФН №{log_fn}")
                         if notification_enabled == True:
                             service.logger.logger_service.info("Уведомление о не соответствии будет отправлено в ТГ")
-                            message = f"ФР №{serial_number} больше не соответствует ФН №{fn_serial}, актуальный для него ФН №{log_fn}.\nСистема будете перезагружена через {hh}ч. {mm}м."
+                            message = (f"ФР №{serial_number} больше не соответствует ФН №{fn_serial}, "
+                                       f"актуальный для него ФН №{log_fn}.\nСистема будете перезагружена "
+                                       f"через {hh}ч. {mm}м.")
                             service.tg_notification.send_tg_message(message)
                         return False
 
         service.logger.logger_service.warning(f"Запись об ФР №{serial_number}, не найдена в файле {latest_file}")
-        disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number, config, i, file_name)
+        disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number,
+                         fiscals_json, i, fiscals_json_name)
         return "skip"
     except Exception:
         service.logger.logger_service.error(f"Неизвестная ошибка при парсинге лога, мне жаль ;(",
@@ -143,7 +155,11 @@ def check_fiscal_register(config, i, file_name, notification_enabled, hh, mm):
         return "skip"
 
 def fn_check_process(config_name, folder_name, exe_name, service_instance):
-    config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data, create=True)
+    config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data,
+                                              create=True)
+    fiscals_json_name = "_resources\\fiscals.json"
+    fiscals_json = service.configs.read_config_file(about.current_path, fiscals_json_name, {"atol":[]},
+                                                    create=True)
 
     target_time = config["validation_fn"].get("target_time", "05:30")
 
@@ -160,8 +176,8 @@ def fn_check_process(config_name, folder_name, exe_name, service_instance):
         while service_instance.is_running:
             reboot_flag = 0
 
-            for i in range(len(config.get("fiscals"))):
-                result_validation = check_validation_date(config, i)
+            for i in range(len(fiscals_json.get("atol"))):
+                result_validation = check_validation_date(config, fiscals_json, i)
                 if result_validation == False:
                     service.logger.logger_service.info(f"По логам будет произведено сопоставление ФР и ФН")
 
@@ -169,26 +185,29 @@ def fn_check_process(config_name, folder_name, exe_name, service_instance):
                     time_sleep_ms = time_sleep * 1000
                     hh = int(time_sleep / 3600)
                     mm = int((time_sleep % 3600) / 60)
-
-                    result_correlation = check_fiscal_register(config, i, config_name, notification_enabled, hh, mm)
+                    if target_time == 0:
+                        hh = 0
+                        mm = 0
+                    result_correlation = check_fiscal_register(config, fiscals_json, i, config_name, fiscals_json_name,
+                                                               notification_enabled, hh, mm)
                     if result_correlation == False:
                         reboot_flag = 1
 
             service.configs.subprocess_run(folder_name, exe_name)
-            remove_empty_serials_from_file()
+            remove_empty_serials_from_file(fiscals_json_name)
 
             if reboot_flag == 1:
                 reboot_file = config["service"].get("reboot_file", "reboot.bat")
 
                 if target_time == 0:
-                    service.configs.subprocess_run("", reboot_file)
+                    service.configs.subprocess_run("_resources", reboot_file)
                 else:
                     service.logger.logger_service.info(f"Через {hh}ч.{mm}м. будет запущен файл '{reboot_file}'")
 
                     rc = win32event.WaitForSingleObject(service_instance.hWaitStop, time_sleep_ms)
                     if rc == win32event.WAIT_OBJECT_0:
                         break
-                    service.configs.subprocess_run("", reboot_file)
+                    service.configs.subprocess_run("_resources", reboot_file)
             service.logger.logger_service.info(f"До следующей проверки осталось {interval_in_hours} часов")
             rc = win32event.WaitForSingleObject(service_instance.hWaitStop, interval)
             if rc == win32event.WAIT_OBJECT_0:
@@ -203,45 +222,54 @@ def get_seconds_until_next_time(target_time):
         # Получаем текущую дату и время
         current = datetime.strptime(current_time(), "%Y-%m-%d %H:%M:%S")
 
-        # Создаем дату на следующий день
-        next_day = current + timedelta(days=1)
-
         try:
             # Разбиваем целевое время на часы и минуты
             target_hour, target_minute = map(int, target_time.split(':'))
         except Exception:
-            target_hour = 4
+            target_hour = 5
             target_minute = 30
+        service.logger.logger_service.debug(f"Из конфига получено время следующей перезагрузки: {target_hour}:"
+                                            f"{target_minute}")
 
         # Создаем новую дату с заменой времени на целевое
-        target_datetime = next_day.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
+        target_datetime = current.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
 
         # Вычисляем разницу в секундах
         difference = (target_datetime - current).total_seconds()
 
+        if difference != abs(difference):
+            # Создаем дату на следующий день
+            next_day = current + timedelta(days=1)
+            target_datetime = next_day.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
+            difference = (target_datetime - current).total_seconds()
+            service.logger.logger_service.debug(f"Расчитано время до следующей перезагрузки: {difference} сек.")
+            return int(difference)
+
+        service.logger.logger_service.debug(f"Расчитано время до следующей перезагрузки: {difference} сек.")
         return int(difference)
     except Exception:
         service.logger.logger_service.error(f"Не удалось вычислить дату для перезагрузки",
                                     exc_info=True)
 
-def remove_empty_serials_from_file():
-    config_name = "service.json"
-    config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data, create=True)
+def remove_empty_serials_from_file(fiscals_json_name):
+    fiscals_json = service.configs.read_config_file(about.current_path, fiscals_json_name, {"atol": []},
+                                                    create=True)
 
     try:
         # Проверяем, есть ли пустые serialNumber
-        if 'fiscals' in config:
-            empty_serials_exist = any(not fiscal.get('serialNumber') for fiscal in config['fiscals'])
+        if 'atol' in fiscals_json:
+            empty_serials_exist = any(not fiscal.get('serialNumber') for fiscal in fiscals_json['atol'])
 
             # Только если есть пустые serialNumber, фильтруем и перезаписываем файл
             if empty_serials_exist:
-                config['fiscals'] = [fiscal for fiscal in config['fiscals'] if fiscal.get('serialNumber')]
-                service.configs.write_json_file(config, config_name)
+                fiscals_json['atol'] = [fiscal for fiscal in fiscals_json['atol'] if fiscal.get('serialNumber')]
+                service.configs.write_json_file(fiscals_json, fiscals_json_name)
     except Exception:
         service.logger.logger_service.error(f"Не удалось очистить конфиг от неактуальных ФР",
                                     exc_info=True)
 
-def disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number, config, i, file_name):
+def disable_check_fr(notification_enabled, get_current_time, validation_date, delete_days, serial_number, fiscals_json,
+                     i, fiscals_json_name):
     difference_in_days = (datetime.strptime(get_current_time, "%Y-%m-%d %H:%M:%S") -
                           datetime.strptime(validation_date, "%Y-%m-%d %H:%M:%S")).days
 
@@ -249,14 +277,15 @@ def disable_check_fr(notification_enabled, get_current_time, validation_date, de
         service.logger.logger_service.warning(
             f"С последней валидации ФР №{serial_number} прошло более {delete_days} дней, запись будет удалена")
 
-        config["fiscals"][i] = {
+        fiscals_json["atol"][i] = {
             "serialNumber": "",
             "fn_serial": "",
             "v_time": ""
         }
-        service.configs.write_json_file(config, file_name)
+        service.configs.write_json_file(fiscals_json, fiscals_json_name)
 
         if notification_enabled == True:
             service.logger.logger_service.info("Уведомление об удалении будет отправлено в ТГ")
-            message = f"Не удалось проверить ФР №{serial_number} более '{delete_days}' дней, дальнейшая проверка будет отключена до следующего успешного подключения к ФР."
+            message = (f"Не удалось проверить ФР №{serial_number} более '{delete_days}' дней, дальнейшая проверка "
+                       f"будет отключена до следующего успешного подключения к ФР.")
             service.tg_notification.send_tg_message(message)

@@ -33,7 +33,8 @@ def logger(file_name, with_console=False):
 
     try:
         config_name = "service.json"
-        config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data, create=True)
+        config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data,
+                                                  create=True)
     except:
         pass
 
@@ -69,7 +70,7 @@ def logger(file_name, with_console=False):
         file_handler.setLevel(LOG_LEVELS[log_level])
 
         # Форматтер для настройки формата сообщений
-        formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+        formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s')
         file_handler.setFormatter(formatter)
 
         # Добавляем обработчик к логгеру
