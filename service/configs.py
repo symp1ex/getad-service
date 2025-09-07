@@ -2,9 +2,6 @@ import service.logger
 import about
 import json
 import os
-import subprocess
-import wmi
-import pythoncom
 
 connect_data = {
     "timeout_to_ip_port": 15,
@@ -28,7 +25,6 @@ connect_data = {
 
 service_data = {
     "service": {
-        "updater_mode": 1,
         "updater_name": "updater.exe",
         "reboot_file": "reboot.bat",
         "log_level": "info",
@@ -96,74 +92,3 @@ def create_json_file(folder_name, file_name, data):
     except Exception:
         service.logger.logger_service.error(f"Не удалось записать данные при создании файла: "
                                             f"'{json_file}'", exc_info=True)
-
-def update_correlation_fiscals(serialNumber, fn_serial, get_current_time, model_kkt):
-    service_file_path = os.path.join("_resources", "fiscals.json")
-    service_json_path = about.current_path
-
-    try:
-        service_data = read_config_file(service_json_path, service_file_path, {model_kkt: []}, create=True)
-
-        # Проверка наличия ключа "fiscals" и добавление новой записи
-        if model_kkt not in service_data:
-            service_data[model_kkt] = []
-
-        existing_entry = next((item for item in service_data[model_kkt] if item["serialNumber"] == serialNumber),
-                              None)
-
-        if existing_entry:
-            # Обновление существующего элемента
-            existing_entry["fn_serial"] = fn_serial
-            existing_entry["v_time"] = get_current_time
-        else:
-            # Добавление нового элемента
-            service_data[model_kkt].append({
-                "serialNumber": serialNumber,
-                "fn_serial": fn_serial,
-                "v_time": get_current_time
-            })
-        # Запись обновленного содержимого обратно в service.json
-        write_json_file(service_data, service_file_path)
-    except Exception:
-        service.logger.logger_service.error(f"Не удалось обновить '{service_json_path}'", exc_info=True)
-
-def subprocess_run(folder_name, file_name):
-    exe_path = os.path.join(about.current_path, folder_name, file_name)
-    service.logger.logger_service.info(f"Будет отдана команда на запуск '{exe_path}'")
-    try:
-        # получаем абсолютный путь к основному файлу скрипта sys.argv[0], а затем с помощью
-        # os.path.dirname() извлекаем путь к директории, содержащей основной файл
-        working_directory = os.path.join(about.current_path,
-                                         folder_name)
-        subprocess.Popen(exe_path, cwd=working_directory)
-    except Exception:
-        service.logger.logger_service.error(f"Не удалось запустить '{exe_path}'", exc_info=True)
-
-
-def check_procces(file_name):
-    service.logger.logger_service.debug(f"Проверяем актвивность процесса '{file_name}'")
-    try:
-        # Инициализируем COM для текущего потока
-        pythoncom.CoInitialize()
-
-        try:
-            c = wmi.WMI()
-            # Ищем процесс по имени
-            for process in c.Win32_Process():
-                if process.Name.lower() == file_name.lower():
-                    service.logger.logger_service.debug(f"Процесс '{file_name}' активен")
-                    return True
-
-            service.logger.logger_service.debug(f"Процесс '{file_name}' неактивен")
-            return False
-
-        finally:
-            # Освобождаем COM
-            pythoncom.CoUninitialize()
-
-    except Exception:
-        service.logger.logger_service.error(f"Не удалось отследить состояние процесса '{file_name}'", exc_info=True)
-        return False
-
-
-

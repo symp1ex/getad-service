@@ -1,5 +1,6 @@
 import service.logger 
 import service.configs
+import service.sys_manager
 from getdata.atol.comautodetect import get_atol_port_dict, current_time
 from getdata.get_remote import get_server_url, get_teamviewer_id, get_anydesk_id, get_hostname, get_litemanager_id
 import about
@@ -9,15 +10,16 @@ import os
 import shutil
 import win32api
 
+processmanager = service.sys_manager.ProcessManagement()
+
 def get_driver_version(file_path):
     try:
-        service.logger.logger_getad.debug(f"Будут получены метаданные файла '{file_path}'")
         info = win32api.GetFileVersionInfo(file_path, '\\')
         version = info['FileVersionMS'] >> 16, info['FileVersionMS'] & 0xFFFF, info['FileVersionLS'] >> 16, info['FileVersionLS'] & 0xFFFF
         service.logger.logger_getad.debug(f"Получены метаданные файла '{file_path}':\n{info}")
         return '.'.join(map(str, version))
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось проверить версию исходного файла", exc_info=True)
+        service.logger.logger_getad.error(f"Не удалось проверить версию установленного драйвера Атол", exc_info=True)
 
 def file_exists_in_root(filename):
     try:
@@ -256,7 +258,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
     except Exception:
         service.logger.logger_getad.error(f"Не удалось сохранить информацию от ККТ", exc_info=True)
 
-    service.configs.update_correlation_fiscals(serialNumber, fn_serial, get_current_time, "atol")
+    processmanager.update_correlation_fiscals(serialNumber, fn_serial, get_current_time, "atol")
 
 def get_date_non_kkt():
     hostname, url_rms, teamviever_id, anydesk_id, litemanager_id = get_remote()
@@ -301,6 +303,7 @@ def rm_old_date():
 
 def get_atol_data():
     fptr10_path = os.path.join(about.current_path, "fptr10.dll")
+    processmanager.get_fiscals_json("atol")
 
     try:
         from getdata.atol.libfptr108 import IFptr  # подтягиваем библиотеку от 10.8 и проверяем версию
@@ -350,7 +353,7 @@ def get_atol_data():
     FR_0 = config.get("atol")[0]["type_connect"]
     FR_1 = config.get("atol")[1]["type_connect"]
 
-    if FR_0 == 2 and timeout_to_ip_port != 0:
+    if (FR_0 == 2 or FR_1 == 2) and timeout_to_ip_port != 0:
         time.sleep(timeout_to_ip_port)
 
     try:
@@ -361,9 +364,6 @@ def get_atol_data():
                 rm_old_date()
                 get_date_kkt(fptr, IFptr, port, installed_version)
             if FR_1 in [1, 2]:
-                if FR_1 == 2 and not timeout_to_ip_port == 0:
-                    time.sleep(timeout_to_ip_port)
-
                 port_2 = connect_kkt(fptr, IFptr, 1)
                 isOpened_2 = status_connect(fptr, port_2)
                 if isOpened_2 == 1:

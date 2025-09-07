@@ -1,6 +1,5 @@
 {
     "service": {
-        "updater_mode": 1,
         "updater_name": "updater.bat",
         "reboot_file": "reboot.bat",
         "log_level": "info",
@@ -8,10 +7,11 @@
     },
     "validation_fn": {
         "enabled": true,
-        "interval": 12,
-        "trigger_days": 3,
+		"forced": false,
+        "interval": 8,
+        "trigger_days": 2,
         "target_time": "05:30",
-        "delete_days": 21,
+        "delete_days": 14,
         "logs_mask_name": "AtolFiscalRegister",
         "logs_dir": "iiko",
         "serialNumber_key": "serialNumber=",

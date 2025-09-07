@@ -3,6 +3,7 @@ import service.configs
 import service.fn_check
 import getdata.atol.atol
 import getdata.shtrih
+import service.sys_manager
 import about
 import win32serviceutil
 import win32service
@@ -13,24 +14,16 @@ import sys
 import os
 
 def run_without_arguments():
+    processmanager = service.sys_manager.ProcessManagement()
     try:
         service.logger.logger_service.debug("Не было получено ни одного аргумента запуска")
         service.logger.logger_service.info("Произведён запуск исполняемого файла не от имени службы")
-        config_name = "service.json"
-        folder_name = "updater"
-        config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data,
-                                                  create=True)
-        exe_name = config["service"].get("updater_name", "updater.exe")
-
-        try: update_enabled = int(config["service"].get("updater_mode", 1))
-        except Exception: update_enabled = 1
 
         getdata.atol.atol.get_atol_data()
-
-        if update_enabled == 1:
-            service.configs.subprocess_run(folder_name, exe_name)
-    except AttributeError:
-        pass
+        processmanager.subprocess_run("updater", processmanager.updater_name)
+    except Exception:
+        service.logger.logger_service.error("Запуск исполняемого файла без аргументов завершился c ошибкой",
+                                            exc_info=True)
 
 class Service(win32serviceutil.ServiceFramework):
     _svc_name_ = "MH_Getad"  # Название службы
@@ -59,42 +52,27 @@ class Service(win32serviceutil.ServiceFramework):
         service.logger.logger_service.info("Служба запущена")
         service.logger.logger_service.info(f"Версия исполянемого файла: {about.version}")
         service_path = os.path.dirname(os.path.abspath(__file__))
-        service.logger.logger_service.info(f"Рабочая директория: '{service_path}'")
+        service.logger.logger_service.debug(f"Рабочая директория: '{service_path}'")
         self.main()
 
     def main(self):
+        validation_fn = service.fn_check.ValidationFn()
         shtrihscanner = getdata.shtrih.ShtrihData()
 
-        config_name = "service.json"
-        folder_name = "updater"
-        config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data,
-                                                  create=True)
-        exe_name = config["service"].get("updater_name", "updater.exe")
-
-        try: validation = int(config.get("validation_fn").get("enabled", 1))
-        except Exception: validation = 1
-
-        try: update_enabled = int(config["service"].get("updater_mode", 1))
-        except Exception: update_enabled = 1
-
         try:
-            if update_enabled == 1:
-                getdata.atol.atol.get_atol_data()
+            getdata.atol.atol.get_atol_data()
 
-                if shtrihscanner.enabled == 1:
-                    shtrihscanner.run(self)
+            if shtrihscanner.enabled == 1:
+                shtrihscanner.run(self)
 
-                if validation == 1:
-                    service.fn_check.fn_check_process(config_name, folder_name, exe_name, self)
+            if validation_fn.validation == 1:
+                validation_fn.fn_check_process(self)
             else:
-                getdata.atol.atol.get_atol_data()
-
-                if shtrihscanner.enabled == 1:
-                    shtrihscanner.run(self)
-
+                validation_fn.subprocess_run("updater", validation_fn.updater_name)
                 self.SvcStop()
         except Exception:
-            service.logger.logger_service.critical(f"Запуск основного потока службы завершился с ошибкой", exc_info=True)
+            service.logger.logger_service.critical(f"Запуск основного потока службы завершился с ошибкой",
+                                                   exc_info=True)
             os._exit(1)
 
 

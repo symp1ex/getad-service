@@ -38,7 +38,7 @@ def logger(file_name, with_console=False):
     except:
         pass
 
-    try: days = int(config["service"].get("log_days", 7))
+    try: days = int(config.get("service", {}).get("log_days", 7))
     except Exception: days = 7
 
     name_log_folder = "logs"
@@ -47,7 +47,7 @@ def logger(file_name, with_console=False):
     if not os.path.exists(log_folder):
         os.makedirs(log_folder)
 
-    try: log_level = config['service'].get('log_level', 'INFO').upper()  # INFO будет значением по умолчанию
+    try: log_level = config.get("service", {}).get('log_level', 'INFO').upper()  # INFO будет значением по умолчанию
     except: log_level = "INFO"
 
     if log_level not in LOG_LEVELS:
