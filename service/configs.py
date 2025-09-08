@@ -4,7 +4,7 @@ import json
 import os
 
 connect_data = {
-    "timeout_to_ip_port": 15,
+    "tcp_timeout": 30,
     "atol": [
         {
             "type_connect": 0,
@@ -92,3 +92,4 @@ def create_json_file(folder_name, file_name, data):
     except Exception:
         service.logger.logger_service.error(f"Не удалось записать данные при создании файла: "
                                             f"'{json_file}'", exc_info=True)
+                                            

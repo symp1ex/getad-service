@@ -21,13 +21,13 @@ class ValidationFn(service.sys_manager.ProcessManagement):
         self.target_time = self.config.get("validation_fn", {}).get("target_time", "05:30")
 
         try: self.validation = int(self.config.get("validation_fn", {}).get("enabled", 1))
-        except Exception: self.validation = 1
+        except: self.validation = 1
 
         try: self.trigger_days = int(self.config.get("validation_fn", {}).get("trigger_days", 3))
-        except Exception: self.trigger_days = 3
+        except: self.trigger_days = 3
 
         try: self.interval_in_hours = int(self.config.get("validation_fn", {}).get("interval", 12))
-        except Exception: self.interval_in_hours = 12
+        except: self.interval_in_hours = 12
 
         self.time_sleep_ms = None
         self.hh = None
@@ -227,7 +227,10 @@ class ValidationFn(service.sys_manager.ProcessManagement):
                         if result_correlation == False:
                             reboot_flag = 1
 
-                self.subprocess_run("updater", self.updater_name)
+                process_not_found = self.check_procces_cycle(self.updater_name, kill_process=True)
+                if process_not_found:
+                    self.subprocess_run("updater", self.updater_name)
+
                 self.remove_empty_serials_from_file()
 
                 if reboot_flag == 1:

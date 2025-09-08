@@ -1,5 +1,5 @@
 {
-    "timeout_to_ip_port": 15,
+    "tcp_timeout": 30,
     "atol": [
         {
             "type_connect": 0,

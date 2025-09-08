@@ -5,7 +5,6 @@ from getdata.atol.comautodetect import get_atol_port_dict, current_time
 from getdata.get_remote import get_server_url, get_teamviewer_id, get_anydesk_id, get_hostname, get_litemanager_id
 import about
 import json
-import time
 import os
 import shutil
 import win32api
@@ -347,14 +346,11 @@ def get_atol_data():
     file_name = "connect.json"
     config = service.configs.read_config_file(about.current_path, file_name, service.configs.connect_data, create=True)
 
-    try: timeout_to_ip_port = int(config.get("timeout_to_ip_port", 15))
-    except Exception: timeout_to_ip_port = 15
-
     FR_0 = config.get("atol")[0]["type_connect"]
     FR_1 = config.get("atol")[1]["type_connect"]
 
-    if (FR_0 == 2 or FR_1 == 2) and timeout_to_ip_port != 0:
-        time.sleep(timeout_to_ip_port)
+    if FR_0 == 2 or FR_1 == 2:
+        processmanager.check_network_cycle()
 
     try:
         if config is not None and not FR_0 == 0:

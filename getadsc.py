@@ -14,8 +14,10 @@ import sys
 import os
 import time
 
+validation_fn = service.fn_check.ValidationFn()
+shtrihscanner = getdata.shtrih.ShtrihData()
+
 def run_without_arguments():
-    shtrihscanner = getdata.shtrih.ShtrihData()
     try:
         service.logger.logger_service.info("Произведён запуск исполняемого файла не от имени службы")
 
@@ -23,6 +25,7 @@ def run_without_arguments():
 
         if shtrihscanner.enabled == 1:
             shtrihscanner.subprocess_run("", shtrihscanner.exe_name)
+            shc_procces_flag = 1
 
             for attempt in range(18):
                 process_found = shtrihscanner.check_procces(shtrihscanner.exe_name)
@@ -33,8 +36,17 @@ def run_without_arguments():
                 else:
                     service.logger.logger_service.info(f"Процесс '{shtrihscanner.exe_name}' "
                                                        f"завершил свою работу или не был запущен")
+                    shc_procces_flag = 0
                     break
-        shtrihscanner.subprocess_run("updater", shtrihscanner.updater_name)
+            if shc_procces_flag:
+                service.logger.logger_service.warn(
+                    f"Процесс '{shtrihscanner.exe_name}' остаётся активным в течении (90) секунд, "
+                    f"работа службы будет продолжена")
+                shtrihscanner.subprocess_kill("", shtrihscanner.exe_name)
+
+        process_not_found = shtrihscanner.check_procces_cycle(shtrihscanner.updater_name, kill_process=True)
+        if process_not_found:
+            shtrihscanner.subprocess_run("updater", shtrihscanner.updater_name)
     except Exception:
         service.logger.logger_service.error("Запуск исполняемого файла без аргументов завершился c ошибкой",
                                             exc_info=True)
@@ -52,6 +64,12 @@ class Service(win32serviceutil.ServiceFramework):
         self.is_running = True
 
     def SvcStop(self):
+        if validation_fn.check_procces(validation_fn.updater_name):
+            validation_fn.subprocess_kill("", validation_fn.updater_name)
+
+        if shtrihscanner.check_procces(shtrihscanner.exe_name):
+            shtrihscanner.subprocess_kill("", shtrihscanner.exe_name)
+
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
         win32event.SetEvent(self.hWaitStop)
         self.is_running = False
@@ -70,9 +88,6 @@ class Service(win32serviceutil.ServiceFramework):
         self.main()
 
     def main(self):
-        validation_fn = service.fn_check.ValidationFn()
-        shtrihscanner = getdata.shtrih.ShtrihData()
-
         try:
             getdata.atol.atol.get_atol_data()
 
@@ -82,11 +97,16 @@ class Service(win32serviceutil.ServiceFramework):
             if validation_fn.validation == 1:
                 validation_fn.fn_check_process(self)
             else:
-                validation_fn.subprocess_run("updater", validation_fn.updater_name)
+                process_not_found = validation_fn.check_procces_cycle(validation_fn.updater_name, kill_process=True)
+                if process_not_found:
+                    validation_fn.subprocess_run("updater", validation_fn.updater_name)
+
+                validation_fn.check_procces_cycle(validation_fn.updater_name, count_attempt=120)
                 self.SvcStop()
         except Exception:
             service.logger.logger_service.critical(f"Запуск основного потока службы завершился с ошибкой",
                                                    exc_info=True)
+            self.SvcStop()
             os._exit(1)
 
 
