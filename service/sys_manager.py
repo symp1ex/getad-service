@@ -8,11 +8,16 @@ import pythoncom
 import subprocess
 import socket
 import time
+import winreg
+import uuid
+import hashlib
 from datetime import datetime
 
 class ResourceManagement:
     config_file = "service.json"
-    fiscals_file = os.path.join("_resources", "fiscals.json")
+    resource_path = "_resources"
+    fiscals_file = os.path.join(about.current_path, resource_path, "fiscals.json")
+    uuid_file = os.path.join(about.current_path, resource_path, "uuid")
 
     def __init__(self):
         self.config = service.configs.read_config_file(about.current_path, self.config_file,
@@ -105,6 +110,58 @@ class ResourceManagement:
         except Exception:
             service.logger.logger_service.error(f"Не удалось очистить '{self.fiscals_file}' от неактуальных записей",
                                                 exc_info=True)
+
+    def get_uuid(self):
+        try:
+            if os.path.exists(self.uuid_file):
+                with open(self.uuid_file, 'r') as f:
+                    stored_uuid = f.read().strip()
+                    # Проверяем, соответствует ли прочитанное значение формату UUID
+                    try:
+                        uuid.UUID(stored_uuid)
+                        service.logger.logger_service.debug(
+                            f"UUID прочитан из файла '{os.path.abspath(self.uuid_file)}': '{stored_uuid}'")
+                        return stored_uuid
+                    except ValueError:
+                        service.logger.logger_service.warning(
+                            f"Содержимое файла '{os.path.abspath(self.uuid_file)}' не соответствует формату UUID")
+        except Exception:
+            service.logger.logger_service.error("Не удалось прочитать файл 'uuid'", exc_info=True)
+
+        try:
+            # Читаем MachineGuid из реестра
+            registry_path = r"SOFTWARE\Microsoft\Cryptography"
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                registry_path,
+                0,
+                winreg.KEY_READ | winreg.KEY_WOW64_64KEY
+            )
+            machine_guid, _ = winreg.QueryValueEx(key, "MachineGuid")
+            service.logger.logger_service.debug(f"Получено значение 'MachineGuid' из реестра: '{machine_guid}'")
+            winreg.CloseKey(key)
+        except Exception:
+            service.logger.logger_service.error(f"Не удалось прочитать 'MachineGuid'", exc_info=True)
+
+        try:
+            # Хэшируем для стабильного UUID
+            hash_bytes = hashlib.sha256(machine_guid.encode('utf-8')).digest()
+            # Создаём UUID из первых 16 байт хэша
+            stable_uuid = uuid.UUID(bytes=hash_bytes[:16])
+            service.logger.logger_service.debug(f"Сформирован uuid: '{stable_uuid}'")
+
+            try:
+                with open(self.uuid_file, 'w') as f:
+                    f.write(str(stable_uuid))
+                service.logger.logger_service.debug(
+                    f"UUID '{stable_uuid}' записан в файл: '{os.path.abspath(self.uuid_file)}'")
+            except Exception:
+                service.logger.logger_service.error(
+                    f"Не удалось записать UUID в файл '{os.path.abspath(self.uuid_file)}'", exc_info=True)
+            return str(stable_uuid)
+        except Exception:
+            service.logger.logger_service.error(f"Не удалось сгенерировать uuid", exc_info=True)
+            return "Error"
 
 class ProcessManagement(ResourceManagement):
     def __init__(self):
@@ -204,7 +261,7 @@ class ProcessManagement(ResourceManagement):
                     continue
                 else:
                     return
-            service.logger.logger_service.warn(f"Сетевое соединения остаётся недоступным в течении "
+            service.logger.logger_service.warn(f"Сетевое соединение остаётся недоступным в течении "
                                                f"({self.tcp_timeout}) секунд. Работа службы будет продолжена")
         except Exception:
             service.logger.logger_service.error("Не удалось проверить доступность сетевого соединения", exc_info=True)

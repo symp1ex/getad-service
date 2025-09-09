@@ -3,7 +3,9 @@ import service.configs
 import service.tg_notification
 import getdata.get_remote
 import service.sys_manager
+from getdata.atol.atol import get_driver_version
 from getdata.atol.comautodetect import current_time
+from getdata.get_remote import get_server_url
 import about
 import re
 import os
@@ -178,7 +180,8 @@ class ValidationFn(service.sys_manager.ProcessManagement):
                         log_serial = match.group(1)
                         log_fn = match.group(2)
                         if log_serial == serial_number:
-                            service.logger.logger_service.info(f"Соответствие ФР и ФН проверено: {log_fn == fn_serial}")
+                            service.logger.logger_service.info(
+                                f"Соответствие ФР и ФН проверено: '{log_fn == fn_serial}'")
                             if log_fn == fn_serial:
                                 json_name = f"{serial_number}.json"
                                 json_path = os.path.join(about.current_path, "date", json_name)
@@ -188,15 +191,20 @@ class ValidationFn(service.sys_manager.ProcessManagement):
                                 self.fiscals_data["atol"][i]["v_time"] = get_current_time
                                 service.configs.write_json_file(self.fiscals_data, self.fiscals_file)
 
+                                json_file["installed_driver"] = get_driver_version()
+                                json_file["url_rms"] = get_server_url()
                                 json_file["v_time"] = get_current_time
                                 json_file["vc"] = about.version
+
                                 service.configs.write_json_file(json_file, json_path)
                                 return True
 
-                            service.logger.logger_service.info(f"Для ФР№{serial_number}, актуальным является ФН №{log_fn}")
+                            service.logger.logger_service.info(
+                                f"Для ФР№{serial_number}, актуальным является ФН №{log_fn}")
                             self.calc_time_before_reboot()
                             if self.notification_enabled == True:
-                                service.logger.logger_service.info("Уведомление о не соответствии будет отправлено в ТГ")
+                                service.logger.logger_service.info(
+                                    "Уведомление о не соответствии будет отправлено в ТГ")
                                 message = (f"ФР №{serial_number} больше не соответствует ФН №{fn_serial}, "
                                            f"актуальный для него ФН №{log_fn}.\nСистема будете перезагружена "
                                            f"через {self.hh}ч. {self.mm}м.")
@@ -227,11 +235,11 @@ class ValidationFn(service.sys_manager.ProcessManagement):
                         if result_correlation == False:
                             reboot_flag = 1
 
+                self.remove_empty_serials_from_file()
+
                 process_not_found = self.check_procces_cycle(self.updater_name, kill_process=True)
                 if process_not_found:
                     self.subprocess_run("updater", self.updater_name)
-
-                self.remove_empty_serials_from_file()
 
                 if reboot_flag == 1:
                     if self.target_time == 0:

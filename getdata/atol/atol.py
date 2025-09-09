@@ -11,7 +11,8 @@ import win32api
 
 processmanager = service.sys_manager.ProcessManagement()
 
-def get_driver_version(file_path):
+def get_driver_version():
+    file_path = "C:\\Program Files (x86)\\ATOL\\Drivers10\\KKT\\bin\\fptr10.dll"
     try:
         info = win32api.GetFileVersionInfo(file_path, '\\')
         version = info['FileVersionMS'] >> 16, info['FileVersionMS'] & 0xFFFF, info['FileVersionLS'] >> 16, info['FileVersionLS'] & 0xFFFF
@@ -19,6 +20,7 @@ def get_driver_version(file_path):
         return '.'.join(map(str, version))
     except Exception:
         service.logger.logger_getad.error(f"Не удалось проверить версию установленного драйвера Атол", exc_info=True)
+        return "Error"
 
 def file_exists_in_root(filename):
     try:
@@ -248,7 +250,8 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
             "litemanager_id": str(litemanager_id),
             "current_time": str(get_current_time),
             "v_time": str(get_current_time),
-            "vc": str(about.version)
+            "vc": str(about.version),
+            "uuid": processmanager.get_uuid()
         }
         folder_name = "date"
         folder_path = os.path.join(about.current_path, folder_name)
@@ -270,7 +273,8 @@ def get_date_non_kkt():
         "anydesk_id": str(anydesk_id),
         "litemanager_id": str(litemanager_id),
         "current_time": str(get_current_time),
-        "vc": str(about.version)
+        "vc": str(about.version),
+        "uuid": processmanager.get_uuid()
     }
     folder_name = "date"
     folder_path = os.path.join(about.current_path, folder_name)
@@ -309,8 +313,7 @@ def get_atol_data():
         if file_exists_in_root(fptr10_path):
             service.logger.logger_getad.info(f"Будет использоваться приоритетный файл библиотеки '{fptr10_path}'")
             try:
-                file_path = "C:\\Program Files (x86)\\ATOL\\Drivers10\\KKT\\bin\\fptr10.dll"
-                installed_version = get_driver_version(file_path)
+                installed_version = get_driver_version()
             except Exception:
                 service.logger.logger_getad.error(f"Не удалось проверить версию установленного драйвера", exc_info=True)
                 installed_version = "Error"

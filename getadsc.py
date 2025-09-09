@@ -44,9 +44,9 @@ def run_without_arguments():
                     f"работа службы будет продолжена")
                 shtrihscanner.subprocess_kill("", shtrihscanner.exe_name)
 
-        process_not_found = shtrihscanner.check_procces_cycle(shtrihscanner.updater_name, kill_process=True)
+        process_not_found = validation_fn.check_procces_cycle(validation_fn.updater_name, count_attempt=120)
         if process_not_found:
-            shtrihscanner.subprocess_run("updater", shtrihscanner.updater_name)
+            validation_fn.subprocess_run("updater", validation_fn.updater_name)
     except Exception:
         service.logger.logger_service.error("Запуск исполняемого файла без аргументов завершился c ошибкой",
                                             exc_info=True)
@@ -64,9 +64,6 @@ class Service(win32serviceutil.ServiceFramework):
         self.is_running = True
 
     def SvcStop(self):
-        if validation_fn.check_procces(validation_fn.updater_name):
-            validation_fn.subprocess_kill("", validation_fn.updater_name)
-
         if shtrihscanner.check_procces(shtrihscanner.exe_name):
             shtrihscanner.subprocess_kill("", shtrihscanner.exe_name)
 
@@ -101,7 +98,6 @@ class Service(win32serviceutil.ServiceFramework):
                 if process_not_found:
                     validation_fn.subprocess_run("updater", validation_fn.updater_name)
 
-                validation_fn.check_procces_cycle(validation_fn.updater_name, count_attempt=120)
                 self.SvcStop()
         except Exception:
             service.logger.logger_service.critical(f"Запуск основного потока службы завершился с ошибкой",
@@ -112,6 +108,11 @@ class Service(win32serviceutil.ServiceFramework):
 
 if __name__ == '__main__':
     if len(sys.argv) == 1:
-        run_without_arguments()
+        try:
+            servicemanager.Initialize()
+            servicemanager.PrepareToHostSingle(Service)
+            servicemanager.StartServiceCtrlDispatcher()
+        except:
+            run_without_arguments()
     else:
         win32serviceutil.HandleCommandLine(Service)
