@@ -40,6 +40,11 @@ class ValidationFn(service.sys_manager.ProcessManagement):
             try:
                 serialNumber = self.fiscals_data.get("atol")[i]["serialNumber"]
                 validation_date = self.fiscals_data.get("atol")[i]["v_time"]
+
+                json_name = f"{serialNumber}.json"
+                json_path = os.path.join(about.current_path, "date", json_name)
+                json_file = service.configs.read_config_file(about.current_path, json_path, "",
+                                                             create=False)
             except Exception:
                 service.logger.logger_service.error(f"Не удалось получить значение запрашиваемого ключа из конфига",
                                                     exc_info=True)
@@ -56,6 +61,15 @@ class ValidationFn(service.sys_manager.ProcessManagement):
                                   datetime.strptime(validation_date, "%Y-%m-%d %H:%M:%S")).days
             valid = difference_in_days < self.trigger_days
             service.logger.logger_service.info(f"Результат валидации ФР №{serialNumber}: '{valid}'")
+
+            try:
+                json_file["installed_driver"] = get_driver_version()
+                json_file["url_rms"] = get_server_url()
+                json_file["vc"] = about.version
+                service.configs.write_json_file(json_file, json_path)
+            except Exception:
+                service.logger.logger_service.warn(f"Не удалось обновить '{os.path.abspath(json_path)}'", exc_info=True)
+
             return valid
         except Exception:
             service.logger.logger_service.error(f"Не удалось вычислить разницу между текущей датой и датой последней "
@@ -184,19 +198,19 @@ class ValidationFn(service.sys_manager.ProcessManagement):
                                 f"Соответствие ФР и ФН проверено: '{log_fn == fn_serial}'")
                             if log_fn == fn_serial:
                                 json_name = f"{serial_number}.json"
-                                json_path = os.path.join(about.current_path, "date", json_name)
-                                json_file = service.configs.read_config_file(about.current_path, json_path, "",
-                                                                             create=False)
+                                try:
+                                    json_path = os.path.join(about.current_path, "date", json_name)
+                                    json_file = service.configs.read_config_file(
+                                        about.current_path, json_path, "", create=False)
+
+                                    json_file["v_time"] = get_current_time
+                                    service.configs.write_json_file(json_file, json_path)
+                                except Exception:
+                                    service.logger.logger_service.error(
+                                        f"Не удалось обновить '{json_name}'", exc_info=True)
 
                                 self.fiscals_data["atol"][i]["v_time"] = get_current_time
                                 service.configs.write_json_file(self.fiscals_data, self.fiscals_file)
-
-                                json_file["installed_driver"] = get_driver_version()
-                                json_file["url_rms"] = get_server_url()
-                                json_file["v_time"] = get_current_time
-                                json_file["vc"] = about.version
-
-                                service.configs.write_json_file(json_file, json_path)
                                 return True
 
                             service.logger.logger_service.info(

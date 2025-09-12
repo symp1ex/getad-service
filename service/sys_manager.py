@@ -24,7 +24,7 @@ class ResourceManagement:
                                                        service.configs.service_data, create=True)
 
         self.config_connect = service.configs.read_config_file(about.current_path, "connect.json",
-                                                               service.configs.service_data, create=True)
+                                                               service.configs.connect_data, create=True)
 
         self.updater_name = self.config.get("service", {}).get("updater_name", "updater.exe")
         self.reboot_file = self.config.get("service", {}).get("reboot_file", "reboot.bat")

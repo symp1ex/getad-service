@@ -64,12 +64,15 @@ class Service(win32serviceutil.ServiceFramework):
         self.is_running = True
 
     def SvcStop(self):
-        if shtrihscanner.check_procces(shtrihscanner.exe_name):
-            shtrihscanner.subprocess_kill("", shtrihscanner.exe_name)
+        shtrihscanner.subprocess_kill("", shtrihscanner.exe_name)
 
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
         win32event.SetEvent(self.hWaitStop)
         self.is_running = False
+
+        service_file = os.path.basename(sys.argv[0])
+        service.logger.logger_service.debug(f"Исполняемый файл службы: '{service_file}'")
+        validation_fn.subprocess_kill("", service_file)
         service.logger.logger_service.info("Служба остановлена")
 
     def SvcDoRun(self):
