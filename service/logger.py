@@ -18,84 +18,94 @@ class StdoutRedirectHandler(logging.StreamHandler):
             # Пишем сообщение в sys.stdout (перехватывается виджетом)
             sys.stdout.write(msg + '\n')
 
-
-def logger(file_name, with_console=False):
-    import service.configs
-
-    # Словарь для маппинга строковых значений в константы logging
-    LOG_LEVELS = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL
-    }
-
+def message_not_logger(message):
     try:
-        config_name = "service.json"
-        config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data,
-                                                  create=True)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open('logs\\logger.log', 'a', encoding='utf-8') as file:
+            file.write(f'\n[{timestamp}] [ERROR] {message}.')
     except:
         pass
 
-    try: days = int(config.get("service", {}).get("log_days", 7))
-    except Exception: days = 7
 
-    name_log_folder = "logs"
-    log_folder = os.path.join(about.current_path, name_log_folder)
+def logger(file_name, with_console=False):
+    import service.configs
+    try:
+        # Словарь для маппинга строковых значений в константы logging
+        LOG_LEVELS = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+            "CRITICAL": logging.CRITICAL
+        }
 
-    if not os.path.exists(log_folder):
-        os.makedirs(log_folder)
+        try:
+            config_name = "service.json"
+            config = service.configs.read_config_file(about.current_path, config_name, service.configs.service_data,
+                                                      create=True)
+        except:
+            pass
 
-    try: log_level = config.get("service", {}).get('log_level', 'INFO').upper()  # INFO будет значением по умолчанию
-    except: log_level = "INFO"
+        try: days = int(config.get("service", {}).get("log_days", 7))
+        except Exception: days = 7
 
-    if log_level not in LOG_LEVELS:
-        log_level = "INFO"
+        name_log_folder = "logs"
+        log_folder = os.path.join(about.current_path, name_log_folder)
 
-    # Создаем логгер
-    logger = logging.getLogger(file_name)
-    logger.setLevel(LOG_LEVELS[log_level])
+        if not os.path.exists(log_folder):
+            os.makedirs(log_folder)
 
-    # Проверяем, не был ли уже добавлен обработчик для этого логгера
-    if not logger.hasHandlers():
-        # Создаем обработчик для вывода в файл с ротацией
-        file_handler = TimedRotatingFileHandler(
-            f"{log_folder}\\{file_name}.log",
-            when="midnight",         # Ротация в полночь
-            interval=1,       # Интервал: 1 день
-            backupCount=days,     # Хранить архивы не дольше 7 дней
-            encoding="utf-8"
-        )
-        file_handler.setLevel(LOG_LEVELS[log_level])
+        try: log_level = config.get("service", {}).get('log_level', 'INFO').upper()  # INFO будет значением по умолчанию
+        except: log_level = "INFO"
 
-        # Форматтер для настройки формата сообщений
-        formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s')
-        file_handler.setFormatter(formatter)
+        if log_level not in LOG_LEVELS:
+            log_level = "INFO"
 
-        # Добавляем обработчик к логгеру
-        logger.addHandler(file_handler)
+        # Создаем логгер
+        logger = logging.getLogger(file_name)
+        logger.setLevel(LOG_LEVELS[log_level])
 
-    # Проверяем, нужно ли создать новый файл лога
-    current_date = datetime.now().date()
-    log_file_path = f"{log_folder}/{file_name}.log"
+        # Проверяем, не был ли уже добавлен обработчик для этого логгера
+        if not logger.hasHandlers():
+            # Создаем обработчик для вывода в файл с ротацией
+            file_handler = TimedRotatingFileHandler(
+                f"{log_folder}\\{file_name}.log",
+                when="midnight",         # Ротация в полночь
+                interval=1,       # Интервал: 1 день
+                backupCount=days,     # Хранить архивы не дольше 7 дней
+                encoding="utf-8"
+            )
+            file_handler.setLevel(LOG_LEVELS[log_level])
 
-    if os.path.exists(log_file_path):
-        # Получаем дату последней модификации файла
-        last_modified_date = datetime.fromtimestamp(os.path.getmtime(log_file_path)).date()
-        if last_modified_date < current_date:
-            # Если дата последней модификации меньше текущей, создаем новый файл
-            file_handler.doRollover()
+            # Форматтер для настройки формата сообщений
+            formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s')
+            file_handler.setFormatter(formatter)
 
-        # Добавляем обработчик для вывода на консоль
-        if with_console:
-            #console_handler = logging.StreamHandler() # вывод в стандартный обработчик бибилиотеки
-            console_handler = StdoutRedirectHandler() # в системный вывод
-            console_handler.setLevel(logging.INFO)
-            console_handler.setFormatter(formatter)
-            logger.addHandler(console_handler)
+            # Добавляем обработчик к логгеру
+            logger.addHandler(file_handler)
 
-    return logger
+        # Проверяем, нужно ли создать новый файл лога
+        current_date = datetime.now().date()
+        log_file_path = f"{log_folder}/{file_name}.log"
+
+        if os.path.exists(log_file_path):
+            # Получаем дату последней модификации файла
+            last_modified_date = datetime.fromtimestamp(os.path.getmtime(log_file_path)).date()
+            if last_modified_date < current_date:
+                # Если дата последней модификации меньше текущей, создаем новый файл
+                file_handler.doRollover()
+
+            # Добавляем обработчик для вывода на консоль
+            if with_console:
+                #console_handler = logging.StreamHandler() # вывод в стандартный обработчик бибилиотеки
+                console_handler = StdoutRedirectHandler() # в системный вывод
+                console_handler.setLevel(logging.INFO)
+                console_handler.setFormatter(formatter)
+                logger.addHandler(console_handler)
+
+        return logger
+    except Exception as e:
+        message_not_logger(f"Не удалось сохранить запись в log-файл: {e}")
 
 logger_service = logger(f"service", with_console=True)
 logger_getad = logger(f"getad", with_console=True)
