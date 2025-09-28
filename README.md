@@ -111,7 +111,7 @@ Options for 'start' and 'stop' commands only:
 </details>
 <br>				 
 <details>
-<summary>Тоже самое работает если служба собрана в <b>.exe-файл</b></summary>
+<summary>То же самое работает если служба собрана в <b>.exe-файл</b></summary>
   
 ```bash
 # Установка службы
@@ -386,4 +386,5 @@ data_to_encrypt2 = "telegram_chat_id"
 @echo off
 cd /d "%~dp0"
 getadsc.exe start
+
 ```
