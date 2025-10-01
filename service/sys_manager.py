@@ -129,6 +129,10 @@ class ResourceManagement:
             service.logger.logger_service.error("Не удалось прочитать файл 'uuid'", exc_info=True)
 
         try:
+            # Получение MAC-адреса
+            mac_address = self.get_mac_address()
+            service.logger.logger_service.debug(f"Получен MAC-адрес: '{mac_address}'")
+
             # Читаем MachineGuid из реестра
             registry_path = r"SOFTWARE\Microsoft\Cryptography"
             key = winreg.OpenKey(
@@ -140,12 +144,16 @@ class ResourceManagement:
             machine_guid, _ = winreg.QueryValueEx(key, "MachineGuid")
             service.logger.logger_service.debug(f"Получено значение 'MachineGuid' из реестра: '{machine_guid}'")
             winreg.CloseKey(key)
+
+            # Комбинируем MAC-адрес и MachineGuid
+            combined_id = f"{mac_address}:{machine_guid}"
         except Exception:
-            service.logger.logger_service.error(f"Не удалось прочитать 'MachineGuid'", exc_info=True)
+            service.logger.logger_service.error(f"Не удалось получить MAC-адрес или MachineGuid", exc_info=True)
+            combined_id = machine_guid  # Используем только MachineGuid если возникла ошибка
 
         try:
             # Хэшируем для стабильного UUID
-            hash_bytes = hashlib.sha256(machine_guid.encode('utf-8')).digest()
+            hash_bytes = hashlib.sha256(combined_id.encode('utf-8')).digest()
             # Создаём UUID из первых 16 байт хэша
             stable_uuid = uuid.UUID(bytes=hash_bytes[:16])
             service.logger.logger_service.debug(f"Сформирован uuid: '{stable_uuid}'")
@@ -162,6 +170,32 @@ class ResourceManagement:
         except Exception:
             service.logger.logger_service.error(f"Не удалось сгенерировать uuid", exc_info=True)
             return "Error"
+
+    def get_mac_address(self):
+        """Получение MAC-адреса сетевого адаптера"""
+        try:
+            # Инициализация WMI
+            pythoncom.CoInitialize()
+            try:
+                c = wmi.WMI()
+                # Получаем все сетевые адаптеры
+                for interface in c.Win32_NetworkAdapterConfiguration(IPEnabled=True):
+                    if interface.MACAddress:
+                        # Возвращаем MAC-адрес первого найденного активного адаптера
+                        return interface.MACAddress
+
+                # Если не нашли активный адаптер, ищем любой с MAC-адресом
+                for interface in c.Win32_NetworkAdapterConfiguration():
+                    if interface.MACAddress:
+                        return interface.MACAddress
+
+                return "00:00:00:00:00:00"  # Возвращаем дефолтный MAC, если ничего не нашли
+            finally:
+                # Освобождаем COM
+                pythoncom.CoUninitialize()
+        except Exception:
+            service.logger.logger_service.error("Не удалось получить MAC-адрес", exc_info=True)
+            return "00:00:00:00:00:00"
 
 class ProcessManagement(ResourceManagement):
     def __init__(self):

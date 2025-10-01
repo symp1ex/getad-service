@@ -30,7 +30,7 @@ def run_without_arguments():
             for attempt in range(18):
                 process_found = shtrihscanner.check_procces(shtrihscanner.exe_name)
                 if process_found:
-                    service.logger.logger_service.debug("Cледущая проверка через (5) секунд.")
+                    service.logger.logger_service.debug("Cледующая проверка через (5) секунд.")
                     time.sleep(5)
                     continue
                 else:
@@ -82,7 +82,7 @@ class Service(win32serviceutil.ServiceFramework):
             (self._svc_name_, '')
         )
         service.logger.logger_service.info("Служба запущена")
-        service.logger.logger_service.info(f"Версия исполянемого файла: {about.version}")
+        service.logger.logger_service.info(f"Версия исполняемого файла: {about.version}")
         service_path = os.path.dirname(os.path.abspath(__file__))
         service.logger.logger_service.debug(f"Рабочая директория: '{service_path}'")
         self.main()

@@ -13,6 +13,9 @@ processmanager = service.sys_manager.ProcessManagement()
 
 def get_driver_version():
     file_path = "C:\\Program Files (x86)\\ATOL\\Drivers10\\KKT\\bin\\fptr10.dll"
+    if not os.path.exists(file_path):
+        file_path = "C:\\Program Files\\ATOL\\Drivers10\\KKT\\bin\\fptr10.dll"
+
     try:
         info = win32api.GetFileVersionInfo(file_path, '\\')
         version = info['FileVersionMS'] >> 16, info['FileVersionMS'] & 0xFFFF, info['FileVersionLS'] >> 16, info['FileVersionLS'] & 0xFFFF
@@ -116,6 +119,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
         INN = fptr.getParamString(1018)
         attribute_excise = fptr.getParamBool(1207)
         attribute_marked = fptr.getParamBool(IFptr.LIBFPTR_PARAM_TRADE_MARKED_PRODUCTS)
+        address = fptr.getParamString(1009)
     except Exception:
         service.logger.logger_getad.error(f"Не удалось сделать запрос к ФР", exc_info=True)
         attribute_marked = "Не поддерживается в текущей версии драйвера"
@@ -238,6 +242,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
             "bootVersion": str(bootVersion),
             "ffdVersion": str(ffdVersion),
             "INN": str(INN),
+            "address": str(address),
             "attribute_excise": str(attribute_excise),
             "attribute_marked": str(attribute_marked),
             "fnExecution": str(fnExecution),

@@ -30,7 +30,7 @@ class ShtrihData(service.sys_manager.ProcessManagement):
             process_found = self.check_procces(self.exe_name)
 
             if process_found:
-                service.logger.logger_service.debug("Cледущая проверка через (5) секунд.")
+                service.logger.logger_service.debug("Cледующая проверка через (5) секунд.")
                 rc = win32event.WaitForSingleObject(service_instance.hWaitStop, 5000)
                 if rc == win32event.WAIT_OBJECT_0:
                     break
