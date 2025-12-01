@@ -11,23 +11,29 @@ import about
 
 
 class MitsuConnect(service.sys_manager.ProcessManagement):
-
     def __init__(self):
         super().__init__()
         self.config_connect = service.configs.read_config_file(about.current_path, "connect.json",
                                                                service.configs.connect_data, create=True)
 
-        self.fr_0 = self.config_connect.get("mitsu")[0]["type_connect"]
-        self.fr_0_com_port = self.config_connect.get("mitsu")[0]["com_port"]
-        self.fr_0_com_baudrate = self.config_connect.get("mitsu")[0]["com_baudrate"]
-        self.fr_0_ip = self.config_connect.get("mitsu")[0]["ip"]
-        self.fr_0_ip_port = int(self.config_connect.get("mitsu")[0]["ip_port"])
+        try: self.fr_0 = int(self.config_connect.get("mitsu")[0]["type_connect"])
+        except: self.fr_0 = 0
 
-        self.fr_1 = self.config_connect.get("mitsu")[1]["type_connect"]
-        self.fr_1_com_port = self.config_connect.get("mitsu")[1]["com_port"]
-        self.fr_1_com_baudrate = self.config_connect.get("mitsu")[1]["com_baudrate"]
-        self.fr_1_ip = self.config_connect.get("mitsu")[1]["ip"]
-        self.fr_1_ip_port = int(self.config_connect.get("mitsu")[1]["ip_port"])
+        if self.fr_0 != 0:
+            self.fr_0_com_port = self.config_connect.get("mitsu")[0]["com_port"]
+            self.fr_0_com_baudrate = self.config_connect.get("mitsu")[0]["com_baudrate"]
+            self.fr_0_ip = self.config_connect.get("mitsu")[0]["ip"]
+            self.fr_0_ip_port = int(self.config_connect.get("mitsu")[0]["ip_port"])
+
+
+        try: self.fr_1 = int(self.config_connect.get("mitsu")[1]["type_connect"])
+        except: self.fr_1 = 0
+
+        if self.fr_1 != 0:
+            self.fr_1_com_port = self.config_connect.get("mitsu")[1]["com_port"]
+            self.fr_1_com_baudrate = self.config_connect.get("mitsu")[1]["com_baudrate"]
+            self.fr_1_ip = self.config_connect.get("mitsu")[1]["ip"]
+            self.fr_1_ip_port = int(self.config_connect.get("mitsu")[1]["ip_port"])
 
     def calculate_lrc(self, data):
         try:
@@ -181,9 +187,9 @@ class MitsuGetData(MitsuConnect):
 
             return None
         except Exception:
-            service.logger.logger_mitsu.error(f"Не удалось извлечь данные из полученного ответа", exc_info=True)
+            service.logger.logger_mitsu.error(f"Не удалось извлечь данные из полученного ответа от ККТ", exc_info=True)
 
-    def decode_attribut_value(self, string, char):
+    def decode_attribute_value(self, string, char):
         # Проверяем типы входных данных
         if not isinstance(string, str):
             return False
@@ -224,8 +230,8 @@ class MitsuGetData(MitsuConnect):
             address = self.get_value_by_tag(reg_data, "<T1009>")
 
             atributes = self.get_value_by_tag(reg_data, "ExtMODE=")
-            attribute_excise = self.decode_attribut_value(atributes, "1")
-            attribute_marked = self.decode_attribut_value(atributes, "7")
+            attribute_excise = self.decode_attribute_value(atributes, "1")
+            attribute_marked = self.decode_attribute_value(atributes, "7")
 
             fnExecution = self.get_value_by_tag(fn_data, "EDITION=")
             hostname = getdata.get_remote.get_hostname()
@@ -296,7 +302,7 @@ class MitsuGetData(MitsuConnect):
 
     def get_data(self):
         if self.fr_0 not in [1, 2] and self.fr_1 not in [1, 2]:
-            service.logger.logger_mitsu.info(f"В файле конфигурации нет данных для подключения к ККТ Mitsu")
+            service.logger.logger_mitsu.info(f"В файле конфигурации не задан тип подключения к ККТ Mitsu")
             return
 
         try: type_connect_atol0 = int(self.config_connect["atol"][0].get("type_connect", 0))

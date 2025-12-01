@@ -24,6 +24,7 @@ def run_without_arguments():
         service.logger.logger_service.info("Произведён запуск исполняемого файла не от имени службы")
 
         getdata.atol.atol.get_atol_data()
+        mitsu.get_data()
 
         if shtrihscanner.enabled == 1:
             shtrihscanner.subprocess_run("", shtrihscanner.exe_name)
