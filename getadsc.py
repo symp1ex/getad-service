@@ -4,6 +4,7 @@ import service.sys_manager
 import service.fn_check
 import getdata.atol.atol
 import getdata.shtrih
+import getdata.mitsu
 import about
 import win32serviceutil
 import win32service
@@ -16,6 +17,7 @@ import time
 
 validation_fn = service.fn_check.ValidationFn()
 shtrihscanner = getdata.shtrih.ShtrihData()
+mitsu = getdata.mitsu.MitsuGetData()
 
 def run_without_arguments():
     try:
@@ -28,7 +30,7 @@ def run_without_arguments():
             shc_procces_flag = 1
 
             for attempt in range(18):
-                process_found = shtrihscanner.check_procces(shtrihscanner.exe_name)
+                process_found = shtrihscanner.check_process(shtrihscanner.exe_name)
                 if process_found:
                     service.logger.logger_service.debug("Cледующая проверка через (5) секунд.")
                     time.sleep(5)
@@ -44,7 +46,7 @@ def run_without_arguments():
                     f"работа службы будет продолжена")
                 shtrihscanner.subprocess_kill("", shtrihscanner.exe_name)
 
-        process_not_found = validation_fn.check_procces_cycle(validation_fn.updater_name, count_attempt=120)
+        process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, count_attempt=120)
         if process_not_found:
             validation_fn.subprocess_run("updater", validation_fn.updater_name)
     except Exception:
@@ -90,6 +92,7 @@ class Service(win32serviceutil.ServiceFramework):
     def main(self):
         try:
             getdata.atol.atol.get_atol_data()
+            mitsu.get_data()
 
             if shtrihscanner.enabled == 1:
                 shtrihscanner.run(self)
@@ -97,7 +100,7 @@ class Service(win32serviceutil.ServiceFramework):
             if validation_fn.validation == 1:
                 validation_fn.fn_check_process(self)
             else:
-                process_not_found = validation_fn.check_procces_cycle(validation_fn.updater_name, kill_process=True)
+                process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, kill_process=True)
                 if process_not_found:
                     validation_fn.subprocess_run("updater", validation_fn.updater_name)
 

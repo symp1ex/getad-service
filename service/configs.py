@@ -10,15 +10,31 @@ connect_data = {
             "type_connect": 0,
             "com_port": "COM4",
             "com_baudrate": "115200",
-            "ip": "10.127.1.22",
+            "ip": "192.168.0.90",
             "ip_port": "5555",
         },
         {
             "type_connect": 0,
             "com_port": "COM10",
             "com_baudrate": "115200",
-            "ip": "10.127.1.100",
+            "ip": "192.168.0.91",
             "ip_port": "5555"
+        }
+    ],
+    "mitsu": [
+        {
+            "type_connect": 0,
+            "com_port": "COM14",
+            "com_baudrate": "115200",
+            "ip": "192.168.0.100",
+            "ip_port": "23458"
+        },
+        {
+            "type_connect": 0,
+            "com_port": "COM20",
+            "com_baudrate": "115200",
+            "ip": "192.168.0.101",
+            "ip_port": "25531"
         }
     ]
 }
@@ -92,4 +108,3 @@ def create_json_file(folder_name, file_name, data):
     except Exception:
         service.logger.logger_service.error(f"Не удалось записать данные при создании файла: "
                                             f"'{json_file}'", exc_info=True)
-                                            

@@ -33,10 +33,3 @@ def get_atol_port_dict():
         return atol_port_dict
     except Exception:
         service.logger.logger_getad.error(f"Не удалось создать словарь со списком com-портов", exc_info=True)
-
-def current_time():
-    try:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        return timestamp
-    except Exception:
-        service.logger.logger_getad.error(f"Не удалось получить текущее время", exc_info=True)

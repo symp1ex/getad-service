@@ -109,3 +109,4 @@ def logger(file_name, with_console=False):
 
 logger_service = logger(f"service", with_console=True)
 logger_getad = logger(f"getad", with_console=True)
+logger_mitsu = logger(f"mitsu", with_console=True)

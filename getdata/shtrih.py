@@ -27,7 +27,7 @@ class ShtrihData(service.sys_manager.ProcessManagement):
             if not service_instance.is_running:
                 break
 
-            process_found = self.check_procces(self.exe_name)
+            process_found = self.check_process(self.exe_name)
 
             if process_found:
                 service.logger.logger_service.debug("Cледующая проверка через (5) секунд.")

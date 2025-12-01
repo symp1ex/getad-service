@@ -4,7 +4,6 @@ import service.tg_notification
 import getdata.get_remote
 import service.sys_manager
 from getdata.atol.atol import get_driver_version
-from getdata.atol.comautodetect import current_time
 from getdata.get_remote import get_server_url
 import about
 import re
@@ -50,7 +49,7 @@ class ValidationFn(service.sys_manager.ProcessManagement):
                                                     exc_info=True)
                 return
 
-            get_current_time = current_time()
+            get_current_time = self.current_time()
 
             service.logger.logger_service.info(f"Будет произведена валидация ФР №{serialNumber}")
             service.logger.logger_service.debug(f"Дата последней валидации: {validation_date}")
@@ -89,7 +88,7 @@ class ValidationFn(service.sys_manager.ProcessManagement):
     def get_seconds_until_next_time(self):
         try:
             # Получаем текущую дату и время
-            current = datetime.strptime(current_time(), "%Y-%m-%d %H:%M:%S")
+            current = datetime.strptime(self.current_time(), "%Y-%m-%d %H:%M:%S")
 
             try:
                 # Разбиваем целевое время на часы и минуты
@@ -113,16 +112,16 @@ class ValidationFn(service.sys_manager.ProcessManagement):
                 next_day = current + timedelta(days=1)
                 target_datetime = next_day.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
                 difference = (target_datetime - current).total_seconds()
-                service.logger.logger_service.debug(f"Расчитано время до следующей перезагрузки: {difference} сек.")
+                service.logger.logger_service.debug(f"Рассчитано время до следующей перезагрузки: {difference} сек.")
                 return int(difference)
 
-            service.logger.logger_service.debug(f"Расчитано время до следующей перезагрузки: {difference} сек.")
+            service.logger.logger_service.debug(f"Рассчитано время до следующей перезагрузки: {difference} сек.")
             return int(difference)
         except Exception:
             service.logger.logger_service.error(f"Не удалось вычислить дату для перезагрузки", exc_info=True)
 
     def check_fiscal_register(self, i):
-        get_current_time = current_time()
+        get_current_time = self.current_time()
 
         # Получаем значения из JSON
         try:
@@ -193,6 +192,7 @@ class ValidationFn(service.sys_manager.ProcessManagement):
                     if match:
                         log_serial = match.group(1)
                         log_fn = match.group(2)
+
                         if log_serial == serial_number:
                             service.logger.logger_service.info(
                                 f"Соответствие ФР и ФН проверено: '{log_fn == fn_serial}'")
@@ -251,7 +251,7 @@ class ValidationFn(service.sys_manager.ProcessManagement):
 
                 self.remove_empty_serials_from_file()
 
-                process_not_found = self.check_procces_cycle(self.updater_name, kill_process=True)
+                process_not_found = self.check_process_cycle(self.updater_name, kill_process=True)
                 if process_not_found:
                     self.subprocess_run("updater", self.updater_name)
 

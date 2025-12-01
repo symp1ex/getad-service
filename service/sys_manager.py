@@ -12,6 +12,7 @@ import winreg
 import uuid
 import hashlib
 from datetime import datetime
+import win32api
 
 class ResourceManagement:
     config_file = "service.json"
@@ -197,6 +198,25 @@ class ResourceManagement:
             service.logger.logger_service.error("Не удалось получить MAC-адрес", exc_info=True)
             return "00:00:00:00:00:00"
 
+    def get_file_version(self, file_path):
+        try:
+            info = win32api.GetFileVersionInfo(file_path, '\\')
+            version = info['FileVersionMS'] >> 16, info['FileVersionMS'] & 0xFFFF, info['FileVersionLS'] >> 16, info[
+                'FileVersionLS'] & 0xFFFF
+            service.logger.logger_getad.debug(f"Получены метаданные файла '{file_path}':\n{info}")
+            return '.'.join(map(str, version))
+        except Exception:
+            service.logger.logger_service.error(f"Не удалось проверить версию файла: '{file_path}'",
+                                              exc_info=True)
+            return "Error"
+
+    def current_time(self):
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            return timestamp
+        except Exception:
+            service.logger.logger_service.error(f"Не удалось получить текущее время", exc_info=True)
+
 class ProcessManagement(ResourceManagement):
     def __init__(self):
         super().__init__()
@@ -225,7 +245,7 @@ class ProcessManagement(ResourceManagement):
         except Exception:
             service.logger.logger_service.error(f"Не удалось отдать команду на завершение процесса: '{exe_name}'",
                                                 exc_info=True)
-    def check_procces(self, file_name):
+    def check_process(self, file_name):
         try:
             # Инициализируем COM для текущего потока
             pythoncom.CoInitialize()
@@ -247,23 +267,26 @@ class ProcessManagement(ResourceManagement):
 
         except Exception:
             service.logger.logger_service.error(f"Не удалось получить статус процесса '{file_name}'", exc_info=True)
-            return False
+            return None
 
-    def check_procces_cycle(self, exe_name, kill_process=False, count_attempt=6):
+    def check_process_cycle(self, exe_name, kill_process=False, count_attempt=6):
         try:
             service.logger.logger_service.debug(f"Проверяем активность процесса '{exe_name}'")
             for attempt in range(count_attempt):
-                process_found = self.check_procces(exe_name)
+                process_found = self.check_process(exe_name)
 
                 if process_found:
                     if kill_process:
                         self.subprocess_kill("", exe_name)
-                    service.logger.logger_service.debug("Cледущая проверка через (5) секунд")
+                    service.logger.logger_service.debug("Следующая проверка через (5) секунд")
                     time.sleep(5)
                     continue
-                else:
+                elif process_found == False:
                     service.logger.logger_service.debug(f"Процесс '{exe_name}' завершил свою работу или не был запущен")
                     return True
+                else:
+                    service.logger.logger_service.warn("Статус процесса неизвестен, работа службы будет продолжена")
+                    return False
             service.logger.logger_service.warn(
                 f"Процесс '{exe_name}' остаётся активным в течении (30) секунд, работа службы будет продолжена")
             return False

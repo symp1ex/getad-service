@@ -1,13 +1,12 @@
 import service.logger 
 import service.configs
 import service.sys_manager
-from getdata.atol.comautodetect import get_atol_port_dict, current_time
+from getdata.atol.comautodetect import get_atol_port_dict
 from getdata.get_remote import get_server_url, get_teamviewer_id, get_anydesk_id, get_hostname, get_litemanager_id
 import about
 import json
 import os
 import shutil
-import win32api
 
 processmanager = service.sys_manager.ProcessManagement()
 
@@ -16,14 +15,8 @@ def get_driver_version():
     if not os.path.exists(file_path):
         file_path = "C:\\Program Files\\ATOL\\Drivers10\\KKT\\bin\\fptr10.dll"
 
-    try:
-        info = win32api.GetFileVersionInfo(file_path, '\\')
-        version = info['FileVersionMS'] >> 16, info['FileVersionMS'] & 0xFFFF, info['FileVersionLS'] >> 16, info['FileVersionLS'] & 0xFFFF
-        service.logger.logger_getad.debug(f"Получены метаданные файла '{file_path}':\n{info}")
-        return '.'.join(map(str, version))
-    except Exception:
-        service.logger.logger_getad.error(f"Не удалось проверить версию установленного драйвера Атол", exc_info=True)
-        return "Error"
+    driver_version = processmanager.get_file_version(file_path)
+    return driver_version
 
 def file_exists_in_root(filename):
     try:
@@ -228,7 +221,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
 
     try:
         hostname, url_rms, teamviever_id, anydesk_id, litemanager_id = get_remote()
-        get_current_time = current_time()
+        get_current_time = processmanager.current_time()
 
         date_json = {
             "modelName": str(modelName),
@@ -269,7 +262,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
 
 def get_date_non_kkt():
     hostname, url_rms, teamviever_id, anydesk_id, litemanager_id = get_remote()
-    get_current_time = current_time()
+    get_current_time = processmanager.current_time()
 
     date_json = {
         "hostname": str(hostname),
