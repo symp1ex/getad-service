@@ -13,6 +13,9 @@ import uuid
 import hashlib
 from datetime import datetime
 import win32api
+import shutil
+
+rm_date_flag = 0
 
 class ResourceManagement:
     config_file = "service.json"
@@ -210,6 +213,21 @@ class ResourceManagement:
                                               exc_info=True)
             return "Error"
 
+    def rm_old_date(self):
+        global rm_date_flag
+
+        if rm_date_flag == 1:
+            return
+
+        rm_date_flag = 1
+        try:
+            old_date = os.path.join(about.current_path, "date")
+            if os.path.exists(old_date):
+                shutil.rmtree(old_date)
+                service.logger.logger_getad.info(f"Старые данные успешно удалены")
+        except Exception:
+            service.logger.logger_getad.error(f"Error: Не удалось удалить старые данные", exc_info=True)
+
     def current_time(self):
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -313,7 +331,7 @@ class ProcessManagement(ResourceManagement):
                 network_found = self.check_network()
 
                 if network_found == False:
-                    service.logger.logger_service.debug(f"Cледущая проверка через (5) секунд")
+                    service.logger.logger_service.debug(f"Cледующая проверка через (5) секунд")
                     time.sleep(5)
                     continue
                 else:

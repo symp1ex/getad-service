@@ -157,10 +157,10 @@ class MitsuGetData(MitsuConnect):
 
     def __init__(self):
         super().__init__()
+        self.driver_path = "C:\\Program Files\\MITSU.1-F\\MitsuCube.exe"
 
     def get_driver_version(self):
-        file_path = "C:\\Program Files\\MITSU.1-F\\MitsuCube.exe"
-        driver_version = self.get_file_version(file_path)
+        driver_version = self.get_file_version(self.driver_path)
         return driver_version
 
     def get_value_by_tag(self, xml_data, tag):
@@ -189,15 +189,6 @@ class MitsuGetData(MitsuConnect):
         except Exception:
             service.logger.logger_mitsu.error(f"Не удалось извлечь данные из полученного ответа от ККТ", exc_info=True)
 
-    def decode_attribute_value(self, string, char):
-        # Проверяем типы входных данных
-        if not isinstance(string, str):
-            return False
-        if not isinstance(char, str) or len(char) != 1:
-            return False
-        # Проверяем наличие символа в строке
-        return char in string
-
     def decode_html_entities(self, text):
         replacements = {
             '&quot;': '"',
@@ -213,7 +204,10 @@ class MitsuGetData(MitsuConnect):
 
     def save_to_fiscals_data(self, model, version, reg_data, fn_data):
         try:
-            modelName = self.get_value_by_tag(model, "DEV=")
+            modelDev = self.get_value_by_tag(model, "DEV=")
+            modelversion = self.get_value_by_tag(reg_data, "T1188=")
+            modelName = f"{modelDev} {modelversion}"
+
             serialNumber = self.get_value_by_tag(version, "SERIAL=")
             RNM = self.get_value_by_tag(reg_data, "T1037=")
 
@@ -229,9 +223,11 @@ class MitsuGetData(MitsuConnect):
             INN = self.get_value_by_tag(reg_data, "T1018=")
             address = self.get_value_by_tag(reg_data, "<T1009>")
 
-            atributes = self.get_value_by_tag(reg_data, "ExtMODE=")
-            attribute_excise = self.decode_attribute_value(atributes, "1")
-            attribute_marked = self.decode_attribute_value(atributes, "7")
+            # получаем значение в виде битовой маски
+            attributes = int(self.get_value_by_tag(reg_data, "ExtMODE="))
+            # проверяем значение 0 и 4 бита
+            attribute_excise = bool((attributes >> 0) & 1)
+            attribute_marked = bool((attributes >> 4) & 1)
 
             fnExecution = self.get_value_by_tag(fn_data, "EDITION=")
             hostname = getdata.get_remote.get_hostname()
@@ -242,7 +238,7 @@ class MitsuGetData(MitsuConnect):
             get_current_time = self.current_time()
 
             date_json = {
-                "modelName": str(modelName),
+                "modelName": modelName,
                 "serialNumber": str(serialNumber),
                 "RNM": str(RNM),
                 "organizationName": str(organizationName),
@@ -269,6 +265,9 @@ class MitsuGetData(MitsuConnect):
                 "vc": str(about.version),
                 "uuid": self.get_uuid()
             }
+
+            self.rm_old_date()
+
             folder_name = "date"
             folder_path = os.path.join(about.current_path, folder_name)
             json_name = f"{serialNumber}.json"

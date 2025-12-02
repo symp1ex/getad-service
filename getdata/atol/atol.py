@@ -293,15 +293,6 @@ def get_remote():
     except Exception:
         service.logger.logger_getad.error(f"Не удалось получить данные с хоста", exc_info=True)
 
-def rm_old_date():
-    try:
-        old_date = os.path.join(about.current_path, "date")
-        if os.path.exists(old_date):
-            shutil.rmtree(old_date)
-            service.logger.logger_getad.info(f"Старые данные успешно удалены")
-    except Exception:
-        service.logger.logger_getad.error(f"Error: Не удалось удалить старые данные", exc_info=True)
-
 def get_atol_data():
     fptr10_path = os.path.join(about.current_path, "fptr10.dll")
     processmanager.get_fiscals_json("atol")
@@ -358,7 +349,7 @@ def get_atol_data():
             port = connect_kkt(fptr, IFptr, 0) # подключаемся к ККТ
             isOpened = status_connect(fptr, port)
             if isOpened == 1:
-                rm_old_date()
+                processmanager.rm_old_date()
                 get_date_kkt(fptr, IFptr, port, installed_version)
             if FR_1 in [1, 2]:
                 port_2 = connect_kkt(fptr, IFptr, 1)
@@ -388,14 +379,14 @@ def get_atol_data():
                 isOpened = status_connect(fptr, port)
                 if isOpened == 1:
                     if check_delete == 0:
-                        rm_old_date()
+                        processmanager.rm_old_date()
                         check_delete = 1
                     get_date_kkt(fptr, IFptr, port, installed_version)
         else:
             port = connect_kkt(fptr, IFptr, 0)  # подключаемся к ККТ
             isOpened = status_connect(fptr, port)
             if isOpened == 1:
-                rm_old_date()
+                processmanager.rm_old_date()
                 get_date_kkt(fptr, IFptr, port, installed_version)
             elif isOpened == 0:
                 get_date_non_kkt()
