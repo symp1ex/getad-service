@@ -41,12 +41,12 @@ class ResourceManagement:
 
         self.fiscals_data = None
 
-    def get_fiscals_json(self, model_kkt):
+    def get_fiscals_json(self):
         self.fiscals_data = service.configs.read_config_file(about.current_path, self.fiscals_file,
-                                                             {model_kkt: []}, create=True)
+                                                             {"atol":[],"mitsu":[]}, create=True)
 
     def update_correlation_fiscals(self, serialNumber, fn_serial, get_current_time, model_kkt):
-        self.get_fiscals_json(model_kkt)
+        self.get_fiscals_json()
 
         try:
             # Проверка наличия ключа "fiscals" и добавление новой записи
@@ -72,8 +72,8 @@ class ResourceManagement:
         except Exception:
             service.logger.logger_service.error(f"Не удалось обновить '{self.fiscals_file}'", exc_info=True)
 
-    def disable_check_fr(self, get_current_time, validation_date, serial_number, i):
-        self.get_fiscals_json("atol")
+    def disable_check_fr(self, get_current_time, validation_date, serial_number, i, model_kkt):
+        self.get_fiscals_json()
         try:
             difference_in_days = (datetime.strptime(get_current_time, "%Y-%m-%d %H:%M:%S") -
                                   datetime.strptime(validation_date, "%Y-%m-%d %H:%M:%S")).days
@@ -83,7 +83,7 @@ class ResourceManagement:
                     f"С последней валидации ФР №{serial_number} прошло более {self.delete_days} дней, "
                     f"запись будет удалена")
 
-                self.fiscals_data["atol"][i] = {
+                self.fiscals_data[model_kkt][i] = {
                     "serialNumber": "",
                     "fn_serial": "",
                     "v_time": ""
@@ -98,17 +98,17 @@ class ResourceManagement:
         except Exception:
             service.logger.logger_service.error(f"Не удалось перезаписать '{self.fiscals_file}'", exc_info=True)
 
-    def remove_empty_serials_from_file(self):
-        self.get_fiscals_json("atol")
+    def remove_empty_serials_from_file(self, model_kkt):
+        self.get_fiscals_json()
 
         try:
             # Проверяем, есть ли пустые serialNumber
-            if 'atol' in self.fiscals_data:
-                empty_serials_exist = any(not fiscal.get('serialNumber') for fiscal in self.fiscals_data['atol'])
+            if model_kkt in self.fiscals_data:
+                empty_serials_exist = any(not fiscal.get('serialNumber') for fiscal in self.fiscals_data[model_kkt])
 
                 # Только если есть пустые serialNumber, фильтруем и перезаписываем файл
                 if empty_serials_exist:
-                    self.fiscals_data['atol'] = [fiscal for fiscal in self.fiscals_data['atol'] if
+                    self.fiscals_data[model_kkt] = [fiscal for fiscal in self.fiscals_data[model_kkt] if
                                                  fiscal.get('serialNumber')]
                     service.configs.write_json_file(self.fiscals_data, self.fiscals_file)
         except Exception:

@@ -295,7 +295,7 @@ def get_remote():
 
 def get_atol_data():
     fptr10_path = os.path.join(about.current_path, "fptr10.dll")
-    processmanager.get_fiscals_json("atol")
+    processmanager.get_fiscals_json()
 
     try:
         from getdata.atol.libfptr108 import IFptr  # подтягиваем библиотеку от 10.8 и проверяем версию

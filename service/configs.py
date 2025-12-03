@@ -53,10 +53,18 @@ service_data = {
         "trigger_days": 2,
         "target_time": "05:30",
         "delete_days": 14,
-        "logs_mask_name": "AtolFiscalRegister",
-        "logs_dir": "iiko",
-        "serialNumber_key": "serialNumber=",
-        "fnNumber_key": "fnNumber="
+        "atol": {
+            "logs_dir": "iiko",
+            "logs_mask_name": "AtolFiscalRegister",
+            "serialNumber_key": "serialNumber=",
+            "fnNumber_key": "fnNumber="
+        },
+        "mitsu": {
+            "logs_dir": "iiko",
+            "logs_mask_name": "MitsuCRPlugin",
+            "serialNumber_key": "SERIAL='",
+            "fnNumber_key": "FN='"
+        }
     },
     "shtrihscanner": {
         "enabled": True,

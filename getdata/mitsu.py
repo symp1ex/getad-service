@@ -203,6 +203,13 @@ class MitsuGetData(MitsuConnect):
         return text
 
     def save_to_fiscals_data(self, model, version, reg_data, fn_data):
+        values_ffd_version = {
+            1: 100,
+            2: 105,
+            3: 110,
+            4: 120
+        }
+
         try:
             modelDev = self.get_value_by_tag(model, "DEV=")
             modelversion = self.get_value_by_tag(reg_data, "T1188=")
@@ -219,7 +226,10 @@ class MitsuGetData(MitsuConnect):
             dateTime_end = self.get_value_by_tag(fn_data, "VALID=")
             ofdName = self.get_value_by_tag(reg_data, "<T1046>")
             bootVersion = self.get_value_by_tag(version, "VER=")
-            ffdVersion = self.get_value_by_tag(reg_data, "T1209=")
+
+            ffdVersion_code = int(self.get_value_by_tag(reg_data, "T1209="))
+            ffdVersion = values_ffd_version[ffdVersion_code]
+
             INN = self.get_value_by_tag(reg_data, "T1018=")
             address = self.get_value_by_tag(reg_data, "<T1009>")
 
@@ -274,6 +284,8 @@ class MitsuGetData(MitsuConnect):
             service.configs.create_json_file(folder_path, json_name, date_json)
         except Exception:
             service.logger.logger_mitsu.error(f"Не удалось сохранить информацию от ККТ", exc_info=True)
+
+        self.update_correlation_fiscals(serialNumber, fn_serial, get_current_time, "mitsu")
 
 
     def get_data_to_com(self, port, baudrate):

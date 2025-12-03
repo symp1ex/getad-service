@@ -2,6 +2,7 @@ import service.logger
 import service.configs
 import service.tg_notification
 import getdata.get_remote
+import getdata.mitsu
 import service.sys_manager
 from getdata.atol.atol import get_driver_version
 from getdata.get_remote import get_server_url
@@ -11,14 +12,16 @@ import os
 import win32event
 from datetime import datetime, timedelta
 
+mitsu = getdata.mitsu.MitsuGetData()
+
 
 class ValidationFn(service.sys_manager.ProcessManagement):
     def __init__(self):
         super().__init__()
-        self.mask_name = self.config.get("validation_fn")['logs_mask_name']
-        self.logs_dir = self.config.get("validation_fn")['logs_dir']
-        self.serialNumber_key = self.config.get("validation_fn")['serialNumber_key']
-        self.fnNumber_key = self.config.get("validation_fn")['fnNumber_key']
+        self.mask_name = None
+        self.logs_dir = None
+        self.serialNumber_key = None
+        self.fnNumber_key = None
         self.target_time = self.config.get("validation_fn", {}).get("target_time", "05:30")
 
         try: self.validation = int(self.config.get("validation_fn", {}).get("enabled", 1))
@@ -30,15 +33,18 @@ class ValidationFn(service.sys_manager.ProcessManagement):
         try: self.interval_in_hours = int(self.config.get("validation_fn", {}).get("interval", 12))
         except: self.interval_in_hours = 12
 
+        try: self.forced = int(self.config.get("validation_fn", {}).get("forced", 0))
+        except: self.forced = 0
+
         self.time_sleep_ms = None
         self.hh = None
         self.mm = None
 
-    def check_validation_date(self, i):
+    def check_validation_date(self, i, model_kkt):
         try:
             try:
-                serialNumber = self.fiscals_data.get("atol")[i]["serialNumber"]
-                validation_date = self.fiscals_data.get("atol")[i]["v_time"]
+                serialNumber = self.fiscals_data.get(model_kkt)[i]["serialNumber"]
+                validation_date = self.fiscals_data.get(model_kkt)[i]["v_time"]
 
                 json_name = f"{serialNumber}.json"
                 json_path = os.path.join(about.current_path, "date", json_name)
@@ -62,7 +68,11 @@ class ValidationFn(service.sys_manager.ProcessManagement):
             service.logger.logger_service.info(f"Результат валидации ФР №{serialNumber}: '{valid}'")
 
             try:
-                json_file["installed_driver"] = get_driver_version()
+                if model_kkt == "atol":
+                    json_file["installed_driver"] = get_driver_version()
+                elif model_kkt == "mitsu":
+                    json_file["installed_driver"] = mitsu.get_driver_version()
+
                 json_file["url_rms"] = get_server_url()
                 json_file["vc"] = about.version
                 service.configs.write_json_file(json_file, json_path)
@@ -120,14 +130,28 @@ class ValidationFn(service.sys_manager.ProcessManagement):
         except Exception:
             service.logger.logger_service.error(f"Не удалось вычислить дату для перезагрузки", exc_info=True)
 
-    def check_fiscal_register(self, i):
+    def check_fiscal_register(self, i, model_kkt):
         get_current_time = self.current_time()
+
+        if model_kkt == "atol":
+            self.mask_name = self.config.get("validation_fn")["atol"]['logs_mask_name']
+            self.logs_dir = self.config.get("validation_fn")["atol"]['logs_dir']
+            self.serialNumber_key = self.config.get("validation_fn")["atol"]['serialNumber_key']
+            self.fnNumber_key = self.config.get("validation_fn")["atol"]['fnNumber_key']
+        elif model_kkt == "mitsu":
+            self.mask_name = self.config.get("validation_fn")["mitsu"]['logs_mask_name']
+            self.logs_dir = self.config.get("validation_fn")["mitsu"]['logs_dir']
+            self.serialNumber_key = self.config.get("validation_fn")["mitsu"]['serialNumber_key']
+            self.fnNumber_key = self.config.get("validation_fn")["mitsu"]['fnNumber_key']
+        else:
+            service.logger.logger_service.debug(f"Для модели ККТ '{model_kkt}' нет подходящих для проверки логов")
+            return "skip"
 
         # Получаем значения из JSON
         try:
-            serial_number = self.fiscals_data.get("atol")[i]['serialNumber']
-            fn_serial = self.fiscals_data.get("atol")[i]['fn_serial']
-            validation_date = self.fiscals_data.get("atol")[i]["v_time"]
+            serial_number = self.fiscals_data.get(model_kkt)[i]['serialNumber']
+            fn_serial = self.fiscals_data.get(model_kkt)[i]['fn_serial']
+            validation_date = self.fiscals_data.get(model_kkt)[i]["v_time"]
         except Exception:
             service.logger.logger_service.error(f"Не удалось получить значение запрашиваемого ключа из конфига",
                                                 exc_info=True)
@@ -141,7 +165,7 @@ class ValidationFn(service.sys_manager.ProcessManagement):
         if not os.path.exists(self.logs_dir):
             service.logger.logger_service.warning(
                 f"Путь до папки с логами: '{self.logs_dir}' не найден, невозможно провести валидацию")
-            self.disable_check_fr(get_current_time, validation_date, serial_number, i)
+            self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
             return "skip"
 
         try:
@@ -155,7 +179,7 @@ class ValidationFn(service.sys_manager.ProcessManagement):
             if not log_files:
                 service.logger.logger_service.warning(f"Файл лога, содержащий в названии '%{self.mask_name}%' "
                                                       f"не найден, невозможно провести валидацию")
-                self.disable_check_fr(get_current_time, validation_date, serial_number, i)
+                self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
                 return "skip"
 
             service.logger.logger_service.debug(f"Найденные следующие файлы логов по пути: '{self.logs_dir}'")
@@ -165,7 +189,7 @@ class ValidationFn(service.sys_manager.ProcessManagement):
             log_days_update = (datetime.strptime(get_current_time, "%Y-%m-%d %H:%M:%S") -
                                timedelta(days=self.trigger_days))
 
-            # Фильтруем файлы, оставляя только те, которые не старше 3 дней
+            # Фильтруем файлы, оставляя только те, которые не старше trigger_days дней
             recent_files = [
                 f for f in log_files
                 if datetime.fromtimestamp(os.path.getmtime(f)) > log_days_update
@@ -174,86 +198,156 @@ class ValidationFn(service.sys_manager.ProcessManagement):
             if not recent_files:
                 service.logger.logger_service.warning(f"Не найдено логов, которые обновлялись бы менее "
                                                       f"'{self.trigger_days}' дней назад")
-                self.disable_check_fr(get_current_time, validation_date, serial_number, i)
+                self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
                 return "skip"
 
             # Находим файл с самой поздней датой изменения
             latest_file = max(recent_files, key=os.path.getmtime)
             service.logger.logger_service.info(f"Будет произведён поиск ФР №{serial_number} по файлу: '{latest_file}'")
 
-            # Регулярка для поиска нужной строки
-            pattern = re.compile(
-                rf'{re.escape(self.serialNumber_key)}(\d+),.*?{re.escape(self.fnNumber_key)}(\d+)\b'
-            )
+            if model_kkt == "atol":
+                # Регулярка для поиска нужной строки в логе Atol
+                pattern = re.compile(
+                    rf'{re.escape(self.serialNumber_key)}(\d+),.*?{re.escape(self.fnNumber_key)}(\d+)\b'
+                )
 
-            with open(latest_file, 'r', encoding='utf-8') as f:
-                for line in f:
-                    match = pattern.search(line)
-                    if match:
-                        log_serial = match.group(1)
-                        log_fn = match.group(2)
+                log_serial = None
+                log_fn = None
 
-                        if log_serial == serial_number:
-                            service.logger.logger_service.info(
-                                f"Соответствие ФР и ФН проверено: '{log_fn == fn_serial}'")
-                            if log_fn == fn_serial:
-                                json_name = f"{serial_number}.json"
-                                try:
-                                    json_path = os.path.join(about.current_path, "date", json_name)
-                                    json_file = service.configs.read_config_file(
-                                        about.current_path, json_path, "", create=False)
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        match = pattern.search(line)
+                        if match:
+                            log_serial = match.group(1)
+                            log_fn = match.group(2)
 
-                                    json_file["v_time"] = get_current_time
-                                    service.configs.write_json_file(json_file, json_path)
-                                except Exception:
-                                    service.logger.logger_service.error(
-                                        f"Не удалось обновить '{json_name}'", exc_info=True)
+                            if log_serial == serial_number:
+                                return self.check_fiscal_register_match_result(log_fn, fn_serial, serial_number,
+                                                                          get_current_time, i, model_kkt)
 
-                                self.fiscals_data["atol"][i]["v_time"] = get_current_time
-                                service.configs.write_json_file(self.fiscals_data, self.fiscals_file)
-                                return True
+                service.logger.logger_service.warning(
+                    f"Запись об ФР №{serial_number}, не найдена в файле '{latest_file}'")
+                self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
+                return "skip"
 
-                            service.logger.logger_service.info(
-                                f"Для ФР№{serial_number}, актуальным является ФН №{log_fn}")
-                            self.calc_time_before_reboot()
-                            if self.notification_enabled == True:
-                                service.logger.logger_service.info(
-                                    "Уведомление о не соответствии будет отправлено в ТГ")
-                                message = (f"ФР №{serial_number} больше не соответствует ФН №{fn_serial}, "
-                                           f"актуальный для него ФН №{log_fn}.\nСистема будете перезагружена "
-                                           f"через {self.hh}ч. {self.mm}м.")
-                                service.tg_notification.send_tg_message(message)
-                            return False
+            elif model_kkt == "mitsu":
+                # Для Mitsu используем другой подход - ищем блок данных, относящийся к нужному ФР
+                serial_pattern = re.compile(rf'{re.escape(self.serialNumber_key)}(\d+)')
+                fn_pattern = re.compile(rf'{re.escape(self.fnNumber_key)}(\d+)')
 
-            service.logger.logger_service.warning(f"Запись об ФР №{serial_number}, не найдена в файле '{latest_file}'")
-            self.disable_check_fr(get_current_time, validation_date, serial_number, i)
-            return "skip"
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    # Флаг, который показывает, что мы нашли серийный номер ФР и ищем соответствующий номер ФН
+                    found_serial = False
+                    log_serial = None
+                    log_fn = None
+
+                    for line in f:
+                        if not found_serial:
+                            # Ищем строку с серийным номером ФР
+                            match_serial = serial_pattern.search(line)
+                            if match_serial:
+                                potential_log_serial = match_serial.group(1)
+                                if potential_log_serial == serial_number:
+                                    log_serial = potential_log_serial
+                                    found_serial = True
+                                    service.logger.logger_service.debug(f"Найден серийный номер ФР: {log_serial}")
+                                    # Продолжаем цикл для поиска номера ФН
+                        else:
+                            # Уже нашли серийный номер, теперь ищем ближайший номер ФН
+                            match_fn = fn_pattern.search(line)
+                            if match_fn:
+                                log_fn = match_fn.group(1)
+                                service.logger.logger_service.debug(f"Найден номер ФН: {log_fn}")
+                                # Нашли номер ФН, можно прекратить поиск
+                                return self.check_fiscal_register_match_result(log_fn, fn_serial, serial_number,
+                                                                               get_current_time, i, model_kkt)
+
+                            # Если мы нашли новый серийный номер до того, как нашли номер ФН,
+                            # это значит, что для текущего ФР номер ФН не указан или начался новый блок
+                            new_match_serial = serial_pattern.search(line)
+                            if new_match_serial and new_match_serial.group(1) != log_serial:
+                                service.logger.logger_service.warning(
+                                    f"Найден новый серийный номер, но не найден номер ФН для ФР №{serial_number}")
+                                found_serial = False
+
+                service.logger.logger_service.warning(
+                    f"Запись об ФР №{serial_number} или соответствующем ФН не найдена в файле '{latest_file}'")
+                self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
+                return "skip"
+
         except Exception:
             service.logger.logger_service.error(f"Неизвестная ошибка при парсинге лога, мне жаль ;(", exc_info=True)
             return "skip"
 
+    def check_fiscal_register_match_result(self, log_fn, fn_serial, serial_number, get_current_time, i, model_kkt):
+        service.logger.logger_service.info(f"Соответствие ФР и ФН проверено: '{log_fn == fn_serial}'")
+
+        if log_fn == fn_serial:
+            json_name = f"{serial_number}.json"
+            try:
+                json_path = os.path.join(about.current_path, "date", json_name)
+                json_file = service.configs.read_config_file(about.current_path, json_path, "", create=False)
+
+                json_file["v_time"] = get_current_time
+                service.configs.write_json_file(json_file, json_path)
+            except Exception:
+                service.logger.logger_service.error(f"Не удалось обновить '{json_name}'", exc_info=True)
+
+            self.fiscals_data[model_kkt][i]["v_time"] = get_current_time
+            service.configs.write_json_file(self.fiscals_data, self.fiscals_file)
+            return True
+
+        service.logger.logger_service.info(f"Для ФР№{serial_number}, актуальным является ФН №{log_fn}")
+
+        self.calc_time_before_reboot()
+
+        if self.notification_enabled == True:
+            service.logger.logger_service.info("Уведомление о не соответствии будет отправлено в ТГ")
+            message = (f"ФР №{serial_number} больше не соответствует ФН №{fn_serial}, "
+                       f"актуальный для него ФН №{log_fn}.\nСистема будете перезагружена "
+                       f"через {self.hh}ч. {self.mm}м.")
+            service.tg_notification.send_tg_message(message)
+        return False
+
     def fn_check_process(self, service_instance):
-        self.get_fiscals_json("atol")
+        self.get_fiscals_json()
 
         interval = 3600000 * self.interval_in_hours
 
         try:
             while service_instance.is_running:
                 reboot_flag = 0
+                break_flag = 0
 
-                for i in range(len(self.fiscals_data.get("atol"))):
-                    result_validation = self.check_validation_date(i)
-                    if result_validation == False:
-                        service.logger.logger_service.info(f"По логам будет произведено сопоставление ФР и ФН")
-                        result_correlation = self.check_fiscal_register(i)
-                        if result_correlation == False:
-                            reboot_flag = 1
+                for model_kkt in self.fiscals_data.keys():
+                    if break_flag == 1:
+                        break
 
-                self.remove_empty_serials_from_file()
+                    if not self.fiscals_data.get(model_kkt):
+                        service.logger.logger_service.debug(f"ККТ модели '{model_kkt}' отсутствуют в базе")
+                        continue
 
-                process_not_found = self.check_process_cycle(self.updater_name, kill_process=True)
-                if process_not_found:
-                    self.subprocess_run("updater", self.updater_name)
+                    service.logger.logger_service.info(f"Проверяем ККТ модели: '{model_kkt}'")
+
+                    for i in range(len(self.fiscals_data.get(model_kkt))):
+                        result_validation = self.check_validation_date(i, model_kkt)
+                        if result_validation == False:
+                            if self.forced == 1:
+                                self.calc_time_before_reboot()
+                                break_flag = 1
+                                reboot_flag = 1
+                                break
+                            service.logger.logger_service.info(f"По логам будет произведено сопоставление ФР и ФН")
+                            result_correlation = self.check_fiscal_register(i, model_kkt)
+                            if result_correlation == False:
+                                reboot_flag = 1
+
+                    self.remove_empty_serials_from_file(model_kkt)
+
+                if reboot_flag == 0:
+                    process_not_found = self.check_process_cycle(self.updater_name, kill_process=True)
+                    if process_not_found:
+                        self.subprocess_run("updater", self.updater_name)
 
                 if reboot_flag == 1:
                     if self.target_time == 0:
