@@ -6,14 +6,14 @@
             "com_port": "COM4",
             "com_baudrate": "115200",
             "ip": "192.168.0.90",
-            "ip_port": "23458"
+            "ip_port": "5555"
         },
         {
             "type_connect": 0,
             "com_port": "COM10",
             "com_baudrate": "115200",
             "ip": "192.168.0.91",
-            "ip_port": "25531"
+            "ip_port": "5555"
         }
     ],
     "mitsu": [
@@ -22,14 +22,14 @@
             "com_port": "COM5",
             "com_baudrate": "115200",
             "ip": "192.168.0.100",
-            "ip_port": "23458"
+            "ip_port": "8200"
         },
         {
             "type_connect": 0,
             "com_port": "COM10",
             "com_baudrate": "115200",
             "ip": "192.168.0.101",
-            "ip_port": "25531"
+            "ip_port": "8200"
         }
     ]
 }

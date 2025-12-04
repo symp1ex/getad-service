@@ -27,14 +27,14 @@ connect_data = {
             "com_port": "COM14",
             "com_baudrate": "115200",
             "ip": "192.168.0.100",
-            "ip_port": "23458"
+            "ip_port": "8200"
         },
         {
             "type_connect": 0,
             "com_port": "COM20",
             "com_baudrate": "115200",
             "ip": "192.168.0.101",
-            "ip_port": "25531"
+            "ip_port": "8200"
         }
     ]
 }

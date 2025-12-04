@@ -340,3 +340,50 @@ class ProcessManagement(ResourceManagement):
                                                f"({self.tcp_timeout}) секунд. Работа службы будет продолжена")
         except Exception:
             service.logger.logger_service.error("Не удалось проверить доступность сетевого соединения", exc_info=True)
+
+    def network_scanning(self):
+        try:
+            service.logger.logger_service.info("Начинаем сканирование сети...")
+            # Получаем список всех сетевых интерфейсов с их IP-адресами
+            interfaces = []
+            result = subprocess.run('ipconfig', capture_output=True, text=True, shell=True)
+
+            for line in result.stdout.splitlines():
+                if "IPv4" in line and ":" in line:
+                    ip = line.split(":")[-1].strip()
+                    if ip and not ip.startswith("127."):  # Исключаем локальные адреса
+                        prefix = '.'.join(ip.split('.')[:3])
+                        interfaces.append(prefix)
+                        service.logger.logger_service.debug(f"Найден сетевой интерфейс с IP: {ip}, префикс: {prefix}.xxx")
+
+            if not interfaces:
+                # Резервный метод получения хотя бы одного IP-адреса
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                host_ip = s.getsockname()[0]
+                s.close()
+                prefix = '.'.join(host_ip.split('.')[:3])
+                interfaces.append(prefix)
+                service.logger.logger_service.debug(f"Получен IP-адрес хоста: '{host_ip}', префикс: {prefix}.xxx")
+
+            service.logger.logger_service.info(f"Найдено сетевых интерфейсов: {len(interfaces)}")
+
+            # Пингуем все адреса во всех подсетях
+            for prefix in interfaces:
+                service.logger.logger_service.info(f"Сканирование подсети {prefix}.0/24 для обновления ARP-таблицы...")
+
+                for i in range(1, 255):
+                    ip = f"{prefix}.{i}"
+                    # Неблокирующий вызов ping с коротким таймаутом
+                    subprocess.Popen(
+                        f'ping -n 1 -w 50 {ip}',
+                        shell=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                # Даем небольшое время для обработки текущей подсети
+                time.sleep(1)
+            # Дополнительная пауза для завершения всех пингов и обновления ARP-таблицы
+            time.sleep(0.5)
+        except Exception:
+            service.logger.logger_service.error("Не удалось просканировать локальную сеть", exc_info=True)

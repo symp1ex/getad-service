@@ -3,6 +3,7 @@ import struct
 import socket
 import os
 import re
+import subprocess
 import service.logger
 import service.configs
 import service.sys_manager
@@ -11,15 +12,37 @@ import about
 
 
 class MitsuConnect(service.sys_manager.ProcessManagement):
+    get_model = "<GET DEV='?' />"
+    get_version = "<GET VER='?' />"
+    get_reg_data = "<GET REG='?'/>"
+    get_fn_data = "<GET INFO='FN'/>"
+
     def __init__(self):
         super().__init__()
+        self.config_connect = None
+
+        self.fr_0 = None
+        self.fr_0_com_port = None
+        self.fr_0_com_baudrate = None
+        self.fr_0_ip = None
+        self.fr_0_ip_port = None
+
+        self.fr_1 = None
+        self.fr_1_com_port = None
+        self.fr_1_com_baudrate = None
+        self.fr_1_ip = None
+        self.fr_1_ip_port = None
+
+        self.mitsu_ips = []
+
+    def config_update(self):
         self.config_connect = service.configs.read_config_file(about.current_path, "connect.json",
                                                                service.configs.connect_data, create=True)
 
         try: self.fr_0 = int(self.config_connect.get("mitsu")[0]["type_connect"])
-        except: self.fr_0 = 0
+        except: self.fr_0 = 3
 
-        if self.fr_0 != 0:
+        if self.fr_0 != 3:
             self.fr_0_com_port = self.config_connect.get("mitsu")[0]["com_port"]
             self.fr_0_com_baudrate = self.config_connect.get("mitsu")[0]["com_baudrate"]
             self.fr_0_ip = self.config_connect.get("mitsu")[0]["ip"]
@@ -27,9 +50,9 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
 
 
         try: self.fr_1 = int(self.config_connect.get("mitsu")[1]["type_connect"])
-        except: self.fr_1 = 0
+        except: self.fr_1 = 3
 
-        if self.fr_1 != 0:
+        if self.fr_1 != 3:
             self.fr_1_com_port = self.config_connect.get("mitsu")[1]["com_port"]
             self.fr_1_com_baudrate = self.config_connect.get("mitsu")[1]["com_baudrate"]
             self.fr_1_ip = self.config_connect.get("mitsu")[1]["ip"]
@@ -68,7 +91,7 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
 
             service.logger.logger_mitsu.info(f"Отправлена команда '{command}' на COM-порт '{port}'")
             # Открываем COM-порт
-            with serial.Serial(port, baudrate, timeout=5) as ser:
+            with serial.Serial(port, baudrate, timeout=0.2) as ser:
                 # Отправляем пакет
                 ser.write(packet)
 
@@ -93,10 +116,12 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
                         return None
                     # Возвращаем ответ без ETX и LRC, декодируем из Windows-1251
                     response = data[:-1].decode('cp1251')
-                    service.logger.logger_mitsu.debug(f"Получен ответ: '{response}'")
+                    service.logger.logger_mitsu.info("Ответ получен")
+                    service.logger.logger_mitsu.debug(f"'{response}'")
                     return response
                 else:
                     service.logger.logger_mitsu.warning("Ответ COM-устройства не подходит под формат")
+                    service.logger.logger_mitsu.debug(f"Ответ: {response}")
                     return None
 
         except Exception:
@@ -141,20 +166,183 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
 
                 # Декодируем ответ из Windows-1251
                 response_decode = response.decode('cp1251')
-                service.logger.logger_mitsu.debug(f"Получен ответ: '{response_decode}'")
+                service.logger.logger_mitsu.info("Ответ получен")
+                service.logger.logger_mitsu.debug(f"'{response_decode}'")
                 return response_decode
 
         except Exception:
             service.logger.logger_mitsu.error(f"Не удалось подключиться к ФР", exc_info=True)
             return None
 
+    def autodetect_com_port(self, baudrate=115200):
+        try:
+            import serial.tools.list_ports
+
+            # Получаем список всех доступных COM-портов
+            available_ports = [port.device for port in serial.tools.list_ports.comports()]
+            service.logger.logger_mitsu.info("Начинаем поиск устройств Mitsu на COM-портах")
+            service.logger.logger_mitsu.info(f"Доступные COM-порты: '{available_ports}'")
+
+            found_ports = []  # Список для хранения найденных портов
+
+            # Проверяем каждый порт
+            for port in available_ports:
+                try:
+                    # Открываем соединение с таймаутом 200 мс
+                    with serial.Serial(port, baudrate, timeout=0.2) as ser:
+                        # Закрываем и снова открываем для сброса буфера
+                        ser.close()
+                        ser.open()
+
+                    # Отправляем запрос для получения модели
+                    response = self.send_command_to_com(self.get_model, port, baudrate)
+
+                    # Если получили ответ, добавляем порт в список найденных
+                    if response is not None:
+                        service.logger.logger_mitsu.info(f"Устройство Mitsu обнаружено на порту '{port}'")
+                        found_ports.append(port)
+
+                        # Если нашли уже 2 порта, возвращаем их
+                        if len(found_ports) == 2:
+                            service.logger.logger_mitsu.info(f"Найдено устройств Mitsu: {len(found_ports)}")
+                            service.logger.logger_mitsu.debug(f"Порты: '{found_ports}'")
+                            return found_ports
+
+                except (serial.SerialException, OSError):
+                    # Пропускаем порты, которые не удалось открыть
+                    service.logger.logger_mitsu.debug(f"Не удалось проверить порт '{port}'")
+                    continue
+
+            # Если нашли хотя бы одно устройство, возвращаем список
+            if found_ports:
+                service.logger.logger_mitsu.info(f"Найдено устройств Mitsu: {len(found_ports)}")
+                service.logger.logger_mitsu.debug(f"Порты: '{found_ports}'")
+                return found_ports
+
+            service.logger.logger_mitsu.warning("Устройств Mitsu не обнаружено ни на одном COM-порту")
+            return []
+
+        except Exception:
+            service.logger.logger_mitsu.error("Ошибка при автоматическом определении COM-порта", exc_info=True)
+            return []
+
+    def scanning_arp_table(self):
+        try:
+            # Сканируем ARP-таблицу для поиска устройств с MAC-адресами, начинающимися с 00-22
+            result = subprocess.run('arp -a', capture_output=True, text=True, shell=True)
+            service.logger.logger_mitsu.debug(f"{result}")
+            for line in result.stdout.splitlines():
+                if '00-22' in line.upper():  # проверяем MAC-адрес
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        ip = parts[0]
+                        self.mitsu_ips.append(ip)
+
+            service.logger.logger_mitsu.info(
+                f"Найдено устройств Mitsu в локальной сети: {len(self.mitsu_ips)}")
+            service.logger.logger_mitsu.debug(f"IP-адреса устройств: '{self.mitsu_ips}'")
+        except Exception:
+            service.logger.logger_mitsu.error("Не удалось получить ARP-таблицу", exc_info=True)
+
+    def autodetect_ethernet_device(self, port=8200, timeout=0.2):
+        try:
+            service.logger.logger_mitsu.info("Поиск Mitsu среди известных устройств в локальной сети")
+            self.scanning_arp_table()
+
+            if self.mitsu_ips == []:
+                service.logger.logger_mitsu.info("Поиск Mitsu среди всех устройств в локальной сети")
+                self.network_scanning()
+                self.scanning_arp_table()
+
+                if self.mitsu_ips == []:
+                    service.logger.logger_mitsu.info(f"Устройства Mitsu в локальной сети не найдены")
+                    return []
+
+            # Проверяем открытость порта 8200 на найденных IP-адресах
+            open_port_ips = []
+
+            for ip in self.mitsu_ips:
+                try:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(timeout)
+                    result = sock.connect_ex((ip, port))
+                    sock.close()
+
+                    if result == 0:  # порт открыт
+                        open_port_ips.append(ip)
+                        service.logger.logger_mitsu.debug(f"Порт {port} открыт на {ip}")
+                except:
+                    service.logger.logger_mitsu.debug(f"Ошибка при проверке порта на {ip}")
+
+            service.logger.logger_mitsu.debug(f"Найдено устройств с открытым портом {port}: {len(open_port_ips)}")
+
+            # Отправляем команду на устройства и проверяем ответ
+            mitsu_devices = []
+
+            for ip in open_port_ips:
+                try:
+                    response = self.send_command_to_ethernet(self.get_model, ip, port)
+                    if response and "<OK DEV=" in response:
+                        service.logger.logger_mitsu.info(f"Устройство Mitsu обнаружено на {ip}:{port}")
+                        mitsu_devices.append(ip)
+
+                        # Если нашли два устройства, останавливаемся
+                        if len(mitsu_devices) == 2:
+                            break
+                except Exception as e:
+                    service.logger.logger_mitsu.debug(f"Ошибка при опросе {ip}: {str(e)}")
+
+            service.logger.logger_mitsu.info(f"Получен ответ от устройств Mitsu: {len(mitsu_devices)}")
+            return mitsu_devices
+
+        except Exception:
+            service.logger.logger_mitsu.error(f"Ошибка при автоматическом определении устройств Mitsu в сети",
+                                              exc_info=True)
+            return []
+
+    def device_autodetect(self):
+        com_port_list = self.autodetect_com_port()
+
+        if len(com_port_list) == 2:
+            self.config_connect["mitsu"][0]["type_connect"] = 1
+            self.config_connect["mitsu"][0]["com_port"] = com_port_list[0]
+
+            self.config_connect["mitsu"][1]["type_connect"] = 1
+            self.config_connect["mitsu"][1]["com_port"] = com_port_list[1]
+
+            service.configs.write_json_file(self.config_connect, "connect.json")
+        elif len(com_port_list) == 1:
+            self.config_connect["mitsu"][0]["type_connect"] = 1
+            self.config_connect["mitsu"][0]["com_port"] = com_port_list[0]
+
+            tcp_port_list = self.autodetect_ethernet_device()
+            if tcp_port_list != []:
+                self.config_connect["mitsu"][1]["type_connect"] = 2
+                self.config_connect["mitsu"][1]["ip"] = tcp_port_list[0]
+
+            service.configs.write_json_file(self.config_connect, "connect.json")
+        else:
+            tcp_port_list = self.autodetect_ethernet_device()
+
+            if len(tcp_port_list) == 2:
+                self.config_connect["mitsu"][0]["type_connect"] = 2
+                self.config_connect["mitsu"][0]["ip"] = tcp_port_list[0]
+
+                self.config_connect["mitsu"][1]["type_connect"] = 2
+                self.config_connect["mitsu"][1]["ip"] = tcp_port_list[1]
+
+                service.configs.write_json_file(self.config_connect, "connect.json")
+            elif len(tcp_port_list) == 1:
+                self.config_connect["mitsu"][0]["type_connect"] = 2
+                self.config_connect["mitsu"][0]["ip"] = tcp_port_list[0]
+                service.configs.write_json_file(self.config_connect, "connect.json")
+            else:
+                self.config_connect["mitsu"][0]["type_connect"] = 3
+                self.config_connect["mitsu"][1]["type_connect"] = 3
+                service.configs.write_json_file(self.config_connect, "connect.json")
+
 
 class MitsuGetData(MitsuConnect):
-    get_model = "<GET DEV='?' />"
-    get_version = "<GET VER='?' />"
-    get_reg_data = "<GET REG='?'/>"
-    get_fn_data = "<GET INFO='FN'/>"
-
     def __init__(self):
         super().__init__()
         self.driver_path = "C:\\Program Files\\MITSU.1-F\\MitsuCube.exe"
@@ -312,6 +500,12 @@ class MitsuGetData(MitsuConnect):
 
 
     def get_data(self):
+        self.config_update()
+
+        if self.fr_0 == 0:
+            self.device_autodetect()
+            self.config_update()
+
         if self.fr_0 not in [1, 2] and self.fr_1 not in [1, 2]:
             service.logger.logger_mitsu.info(f"В файле конфигурации не задан тип подключения к ККТ Mitsu")
             return
@@ -328,10 +522,10 @@ class MitsuGetData(MitsuConnect):
         try:
             if self.fr_0 == 1:
                 model, version, reg_data, fn_data = self.get_data_to_com(self.fr_0_com_port, self.fr_0_com_baudrate)
+                self.save_to_fiscals_data(model, version, reg_data, fn_data)
             if self.fr_0 == 2:
                 model, version, reg_data, fn_data = self.get_data_to_ethernet(self.fr_0_ip, self.fr_0_ip_port)
-
-            self.save_to_fiscals_data(model, version, reg_data, fn_data)
+                self.save_to_fiscals_data(model, version, reg_data, fn_data)
         except Exception:
             service.logger.logger_mitsu.warning(f"Запрос к первой ККТ завершился ошибкой",
                                                 exc_info=True)
@@ -341,10 +535,10 @@ class MitsuGetData(MitsuConnect):
         try:
             if self.fr_1 == 1:
                 model_1, version_1, reg_data_1, fn_data_1 = self.get_data_to_com(self.fr_1_com_port, self.fr_1_com_baudrate)
+                self.save_to_fiscals_data(model_1, version_1, reg_data_1, fn_data_1)
             if self.fr_1 == 2:
                 model_1, version_1, reg_data_1, fn_data_1 = self.get_data_to_ethernet(self.fr_1_ip, self.fr_1_ip_port)
-
-            self.save_to_fiscals_data(model_1, version_1, reg_data_1, fn_data_1)
+                self.save_to_fiscals_data(model_1, version_1, reg_data_1, fn_data_1)
         except Exception:
             service.logger.logger_mitsu.warning(f"Запрос ко второй ККТ завершился ошибкой",
                                                 exc_info=True)
