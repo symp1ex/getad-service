@@ -14,6 +14,7 @@ import socket
 import sys
 import os
 import time
+import multiprocessing
 
 validation_fn = service.fn_check.ValidationFn()
 shtrihscanner = getdata.shtrih.ShtrihData()
@@ -54,6 +55,10 @@ def run_without_arguments():
         service.logger.logger_service.error("Запуск исполняемого файла без аргументов завершился c ошибкой",
                                             exc_info=True)
 
+def get_fiscals_data():
+    getdata.atol.atol.get_atol_data()
+    mitsu.get_data()
+
 class Service(win32serviceutil.ServiceFramework):
     _svc_name_ = "MH_Getad"  # Название службы
     _svc_display_name_ = "MH_Getad"  # Отображаемое имя службы
@@ -92,8 +97,10 @@ class Service(win32serviceutil.ServiceFramework):
 
     def main(self):
         try:
-            getdata.atol.atol.get_atol_data()
-            mitsu.get_data()
+            fiscals_data = multiprocessing.Process(target=get_fiscals_data)
+            fiscals_data.daemon = True
+            fiscals_data.start()
+            fiscals_data.join()
 
             if shtrihscanner.enabled == 1:
                 shtrihscanner.run(self)
@@ -114,6 +121,7 @@ class Service(win32serviceutil.ServiceFramework):
 
 
 if __name__ == '__main__':
+    multiprocessing.freeze_support()
     if len(sys.argv) == 1:
         try:
             servicemanager.Initialize()

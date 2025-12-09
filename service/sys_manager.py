@@ -3,8 +3,6 @@ import service.configs
 import service.tg_notification
 import about
 import os
-import wmi
-import pythoncom
 import subprocess
 import socket
 import time
@@ -20,6 +18,7 @@ rm_date_flag = 0
 class ResourceManagement:
     config_file = "service.json"
     resource_path = "_resources"
+    date_path = os.path.join(about.current_path, "date")
     fiscals_file = os.path.join(about.current_path, resource_path, "fiscals.json")
     uuid_file = os.path.join(about.current_path, resource_path, "uuid")
 
@@ -43,7 +42,7 @@ class ResourceManagement:
 
     def get_fiscals_json(self):
         self.fiscals_data = service.configs.read_config_file(about.current_path, self.fiscals_file,
-                                                             {"atol":[],"mitsu":[]}, create=True)
+                                                             {"atol":[],"mitsu":[],"shtrih":[]}, create=True)
 
     def update_correlation_fiscals(self, serialNumber, fn_serial, get_current_time, model_kkt):
         self.get_fiscals_json()
@@ -90,13 +89,23 @@ class ResourceManagement:
                 }
                 service.configs.write_json_file(self.fiscals_data, self.fiscals_file)
 
+                json_name = f"{serial_number}.json"
+                json_path = os.path.join(self.date_path, json_name)
+                try:
+                    if os.path.exists(json_path):
+                        os.remove(json_path)
+                        service.logger.logger_service.info(f"Файл {json_path} удалён")
+                except Exception:
+                    service.logger.logger_service.error(f"Не удалось удалить файл '{json_path}'",
+                                                        exc_info=True)
+
                 if self.notification_enabled == True:
                     service.logger.logger_service.info("Уведомление об удалении будет отправлено в ТГ")
                     message = (f"Не удалось проверить ФР №{serial_number} более '{self.delete_days}' дней, "
                                f"дальнейшая проверка будет отключена до следующего успешного подключения к ФР.")
                     service.tg_notification.send_tg_message(message)
         except Exception:
-            service.logger.logger_service.error(f"Не удалось перезаписать '{self.fiscals_file}'", exc_info=True)
+            service.logger.logger_service.error(f"Не удалось отключить проверку ФР№{serial_number}", exc_info=True)
 
     def remove_empty_serials_from_file(self, model_kkt):
         self.get_fiscals_json()
@@ -135,7 +144,6 @@ class ResourceManagement:
         try:
             # Получение MAC-адреса
             mac_address = self.get_mac_address()
-            service.logger.logger_service.debug(f"Получен MAC-адрес: '{mac_address}'")
 
             # Читаем MachineGuid из реестра
             registry_path = r"SOFTWARE\Microsoft\Cryptography"
@@ -175,30 +183,41 @@ class ResourceManagement:
             service.logger.logger_service.error(f"Не удалось сгенерировать uuid", exc_info=True)
             return "Error"
 
-    def get_mac_address(self):
-        """Получение MAC-адреса сетевого адаптера"""
+    def get_host_ip(self):
         try:
-            # Инициализация WMI
-            pythoncom.CoInitialize()
-            try:
-                c = wmi.WMI()
-                # Получаем все сетевые адаптеры
-                for interface in c.Win32_NetworkAdapterConfiguration(IPEnabled=True):
-                    if interface.MACAddress:
-                        # Возвращаем MAC-адрес первого найденного активного адаптера
-                        return interface.MACAddress
-
-                # Если не нашли активный адаптер, ищем любой с MAC-адресом
-                for interface in c.Win32_NetworkAdapterConfiguration():
-                    if interface.MACAddress:
-                        return interface.MACAddress
-
-                return "00:00:00:00:00:00"  # Возвращаем дефолтный MAC, если ничего не нашли
-            finally:
-                # Освобождаем COM
-                pythoncom.CoUninitialize()
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            host_ip = s.getsockname()[0]
+            s.close()
+            return host_ip
         except Exception:
-            service.logger.logger_service.error("Не удалось получить MAC-адрес", exc_info=True)
+            service.logger.logger_service.error(f"Не удалось получить IP-адрес хоста", exc_info=True)
+
+    def get_mac_address(self):
+        try:
+            mac_int = uuid.getnode()
+            # uuid.getnode() возвращает MAC как целое число.
+            # Если возвращается 0, это может означать, что MAC не был найден,
+            # или были какие-то проблемы с получением.
+            if mac_int == 0:
+                service.logger.logger_service.warning(
+                    "uuid.getnode() вернул 0. Возможно, MAC-адрес не найден или есть проблемы "
+                    "с получением адреса первой активной сетевой карты."
+                )
+                return "00:00:00:00:00:00"
+
+            # Преобразуем целое число в шестнадцатеричную строку, дополняя нулями до 12 символов.
+            mac_hex = format(mac_int, '012x')
+
+            # Форматируем строку MAC-адреса с двоеточиями
+            mac_address = ':'.join(mac_hex[i:i+2] for i in range(0, 12, 2)).upper()
+
+            service.logger.logger_service.debug(f"Получен MAC-адрес: '{mac_address}'")
+            return mac_address
+
+        except Exception:
+            service.logger.logger_service.error(
+                "Не удалось получить MAC-адрес с помощью uuid.getnode()", exc_info=True)
             return "00:00:00:00:00:00"
 
     def get_file_version(self, file_path):
@@ -206,7 +225,7 @@ class ResourceManagement:
             info = win32api.GetFileVersionInfo(file_path, '\\')
             version = info['FileVersionMS'] >> 16, info['FileVersionMS'] & 0xFFFF, info['FileVersionLS'] >> 16, info[
                 'FileVersionLS'] & 0xFFFF
-            service.logger.logger_getad.debug(f"Получены метаданные файла '{file_path}':\n{info}")
+            service.logger.logger_service.debug(f"Получены метаданные файла '{file_path}':\n{info}")
             return '.'.join(map(str, version))
         except Exception:
             service.logger.logger_service.error(f"Не удалось проверить версию файла: '{file_path}'",
@@ -221,12 +240,11 @@ class ResourceManagement:
 
         rm_date_flag = 1
         try:
-            old_date = os.path.join(about.current_path, "date")
-            if os.path.exists(old_date):
-                shutil.rmtree(old_date)
-                service.logger.logger_getad.info(f"Старые данные успешно удалены")
+            if os.path.exists(self.date_path):
+                shutil.rmtree(self.date_path)
+                service.logger.logger_service.info(f"Старые данные успешно удалены")
         except Exception:
-            service.logger.logger_getad.error(f"Error: Не удалось удалить старые данные", exc_info=True)
+            service.logger.logger_service.error(f"Error: Не удалось удалить старые данные", exc_info=True)
 
     def current_time(self):
         try:
@@ -265,26 +283,37 @@ class ProcessManagement(ResourceManagement):
                                                 exc_info=True)
     def check_process(self, file_name):
         try:
-            # Инициализируем COM для текущего потока
-            pythoncom.CoInitialize()
+            command_str = f'tasklist | findstr /i "{file_name}" >nul'
 
-            try:
-                c = wmi.WMI()
-                # Ищем процесс по имени
-                for process in c.Win32_Process():
-                    if process.Name.lower() == file_name.lower():
-                        service.logger.logger_service.debug(f"Процесс '{file_name}' активен")
-                        return True
+            result = subprocess.run(
+                command_str,
+                shell=True,
+                capture_output=False,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+                check=False
+            )
 
+            if result.returncode == 0:
+                service.logger.logger_service.debug(f"Процесс '{file_name}' активен")
+                return True
+            elif result.returncode == 1:
                 service.logger.logger_service.debug(f"Процесс '{file_name}' неактивен")
                 return False
+            else:
+                # Если returncode не 0 или 1, это указывает на ошибку выполнения команды
+                service.logger.logger_service.warning(
+                    f"Ошибка выполнения команды CMD для процесса '{file_name}'. Код возврата: {result.returncode}",)
+                return None
 
-            finally:
-                # Освобождаем COM
-                pythoncom.CoUninitialize()
-
+        except FileNotFoundError:
+            # Это исключение может возникнуть, если 'cmd.exe' или одна из команд
+            # ('tasklist', 'findstr') не найдена в системном PATH.
+            service.logger.logger_service.error( f"Команда CMD или ее компоненты (tasklist/findstr) не найдены. "
+                                                 f"Убедитесь, что они доступны в системном PATH.", exc_info=True)
+            return None
         except Exception:
-            service.logger.logger_service.error(f"Не удалось получить статус процесса '{file_name}'", exc_info=True)
+            service.logger.logger_service.error(
+                f"Не удалось получить статус процесса '{file_name}' через CMD (tasklist|findstr)", exc_info=True)
             return None
 
     def check_process_cycle(self, exe_name, kill_process=False, count_attempt=6):
@@ -358,10 +387,7 @@ class ProcessManagement(ResourceManagement):
 
             if not interfaces:
                 # Резервный метод получения хотя бы одного IP-адреса
-                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                host_ip = s.getsockname()[0]
-                s.close()
+                host_ip = self.get_host_ip()
                 prefix = '.'.join(host_ip.split('.')[:3])
                 interfaces.append(prefix)
                 service.logger.logger_service.debug(f"Получен IP-адрес хоста: '{host_ip}', префикс: {prefix}.xxx")
@@ -376,7 +402,7 @@ class ProcessManagement(ResourceManagement):
                     ip = f"{prefix}.{i}"
                     # Неблокирующий вызов ping с коротким таймаутом
                     subprocess.Popen(
-                        f'ping -n 1 -w 50 {ip}',
+                        f'ping -n 1 -w 100 {ip}',
                         shell=True,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL
@@ -384,6 +410,6 @@ class ProcessManagement(ResourceManagement):
                 # Даем небольшое время для обработки текущей подсети
                 time.sleep(1)
             # Дополнительная пауза для завершения всех пингов и обновления ARP-таблицы
-            time.sleep(0.5)
+            time.sleep(1)
         except Exception:
             service.logger.logger_service.error("Не удалось просканировать локальную сеть", exc_info=True)

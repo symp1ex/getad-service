@@ -1,3 +1,4 @@
+import time
 import serial
 import struct
 import socket
@@ -91,9 +92,13 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
 
             service.logger.logger_mitsu.info(f"Отправлена команда '{command}' на COM-порт '{port}'")
             # Открываем COM-порт
-            with serial.Serial(port, baudrate, timeout=0.2) as ser:
-                # Отправляем пакет
-                ser.write(packet)
+            with serial.Serial(port, baudrate, timeout=0.2, write_timeout=0.2) as ser:
+                try:
+                    # Отправляем пакет
+                    ser.write(packet)
+                except serial.SerialTimeoutException:
+                    service.logger.logger_mitsu.warning("Истекло время ожидания ответа")
+                    return None
 
                 # Считываем ответ (без STX и длины)
                 response = b''
@@ -112,7 +117,7 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
                     calculated_lrc = self.calculate_lrc(data)
 
                     if received_lrc != calculated_lrc:
-                        service.logger.logger_mitsu.warning("Ошибка: неверная контрольная сумма")
+                        service.logger.logger_mitsu.warning("Неверная контрольная сумма")
                         return None
                     # Возвращаем ответ без ETX и LRC, декодируем из Windows-1251
                     response = data[:-1].decode('cp1251')
@@ -123,7 +128,6 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
                     service.logger.logger_mitsu.warning("Ответ COM-устройства не подходит под формат")
                     service.logger.logger_mitsu.debug(f"Ответ: {response}")
                     return None
-
         except Exception:
             service.logger.logger_mitsu.error(f"Не удалось подключиться к ФР", exc_info=True)
             return None
@@ -210,7 +214,7 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
 
                 except (serial.SerialException, OSError):
                     # Пропускаем порты, которые не удалось открыть
-                    service.logger.logger_mitsu.debug(f"Не удалось проверить порт '{port}'")
+                    service.logger.logger_mitsu.info(f"Не удалось открыть порт '{port}'")
                     continue
 
             # Если нашли хотя бы одно устройство, возвращаем список
