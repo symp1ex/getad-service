@@ -2,6 +2,7 @@ import service.logger
 import service.configs
 import service.sys_manager
 import service.fn_check
+import service.connectors
 import getdata.atol.atol
 import getdata.shtrih
 import getdata.mitsu
@@ -19,6 +20,7 @@ import multiprocessing
 validation_fn = service.fn_check.ValidationFn()
 shtrihscanner = getdata.shtrih.ShtrihData()
 mitsu = getdata.mitsu.MitsuGetData()
+sending_data = service.connectors.SendingData()
 
 def run_without_arguments():
     try:
@@ -38,8 +40,8 @@ def run_without_arguments():
                     time.sleep(5)
                     continue
                 else:
-                    service.logger.logger_service.info(f"Процесс '{shtrihscanner.exe_name}' "
-                                                       f"завершил свою работу или не был запущен")
+                    service.logger.logger_service.info(
+                        f"Процесс '{shtrihscanner.exe_name}' завершил свою работу или не был запущен")
                     shc_procces_flag = 0
                     break
             if shc_procces_flag:
@@ -48,12 +50,16 @@ def run_without_arguments():
                     f"работа службы будет продолжена")
                 shtrihscanner.subprocess_kill("", shtrihscanner.exe_name)
 
+        if sending_data.sending_data_enabled == True:
+            sending_data.authentication_data()
+            sending_data.send_fiscals_data()
+
         process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, count_attempt=120)
         if process_not_found:
             validation_fn.subprocess_run("updater", validation_fn.updater_name)
     except Exception:
-        service.logger.logger_service.error("Запуск исполняемого файла без аргументов завершился c ошибкой",
-                                            exc_info=True)
+        service.logger.logger_service.error(
+            "Запуск исполняемого файла без аргументов завершился c ошибкой", exc_info=True)
 
 def get_fiscals_data():
     getdata.atol.atol.get_atol_data()
@@ -108,14 +114,18 @@ class Service(win32serviceutil.ServiceFramework):
             if validation_fn.validation == 1:
                 validation_fn.fn_check_process(self)
             else:
+                if sending_data.sending_data_enabled == True:
+                    sending_data.authentication_data()
+                    sending_data.send_fiscals_data()
+
                 process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, kill_process=True)
                 if process_not_found:
                     validation_fn.subprocess_run("updater", validation_fn.updater_name)
 
                 self.SvcStop()
         except Exception:
-            service.logger.logger_service.critical(f"Запуск основного потока службы завершился с ошибкой",
-                                                   exc_info=True)
+            service.logger.logger_service.critical(
+                f"Запуск основного потока службы завершился с ошибкой", exc_info=True)
             self.SvcStop()
             os._exit(1)
 

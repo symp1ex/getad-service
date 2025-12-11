@@ -46,6 +46,16 @@ service_data = {
         "log_level": "info",
         "log_days": 7
     },
+    "sending_data": {
+        "enabled": False,
+        "authentication": {
+            "encryption": False,
+            "url": "",
+            "api_key": ""
+        },
+        "max_attempts": 5,
+        "delay": 10
+    },
     "validation_fn": {
         "enabled": True,
         "forced": False,

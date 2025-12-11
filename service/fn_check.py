@@ -1,6 +1,6 @@
 import service.logger
 import service.configs
-import service.tg_notification
+import service.connectors
 import getdata.get_remote
 import getdata.mitsu
 import service.sys_manager
@@ -13,6 +13,8 @@ import win32event
 from datetime import datetime, timedelta
 
 mitsu = getdata.mitsu.MitsuGetData()
+tg_notification = service.connectors.TelegramNotification()
+sending_data = service.connectors.SendingData()
 
 
 class ValidationFn(service.sys_manager.ProcessManagement):
@@ -165,7 +167,13 @@ class ValidationFn(service.sys_manager.ProcessManagement):
         if not os.path.exists(self.logs_dir):
             service.logger.logger_service.warning(
                 f"Путь до папки с логами: '{self.logs_dir}' не найден, невозможно провести валидацию")
-            self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
+            disable_check_fr = self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
+
+            if self.notification_enabled == True and disable_check_fr == True:
+                service.logger.logger_service.info("Уведомление об удалении будет отправлено в ТГ")
+                message = (f"Не удалось проверить ФР №{serial_number} более '{self.delete_days}' дней, "
+                           f"дальнейшая проверка будет отключена до следующего успешного подключения к ФР.")
+                tg_notification.send_tg_message(message)
             return "skip"
 
         try:
@@ -179,7 +187,13 @@ class ValidationFn(service.sys_manager.ProcessManagement):
             if not log_files:
                 service.logger.logger_service.warning(f"Файл лога, содержащий в названии '%{self.mask_name}%' "
                                                       f"не найден, невозможно провести валидацию")
-                self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
+                disable_check_fr = self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
+
+                if self.notification_enabled == True and disable_check_fr == True:
+                    service.logger.logger_service.info("Уведомление об удалении будет отправлено в ТГ")
+                    message = (f"Не удалось проверить ФР №{serial_number} более '{self.delete_days}' дней, "
+                               f"дальнейшая проверка будет отключена до следующего успешного подключения к ФР.")
+                    tg_notification.send_tg_message(message)
                 return "skip"
 
             service.logger.logger_service.debug(f"Найденные следующие файлы логов по пути: '{self.logs_dir}'")
@@ -198,7 +212,13 @@ class ValidationFn(service.sys_manager.ProcessManagement):
             if not recent_files:
                 service.logger.logger_service.warning(f"Не найдено логов, которые обновлялись бы менее "
                                                       f"'{self.trigger_days}' дней назад")
-                self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
+                disable_check_fr = self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
+
+                if self.notification_enabled == True and disable_check_fr == True:
+                    service.logger.logger_service.info("Уведомление об удалении будет отправлено в ТГ")
+                    message = (f"Не удалось проверить ФР №{serial_number} более '{self.delete_days}' дней, "
+                               f"дальнейшая проверка будет отключена до следующего успешного подключения к ФР.")
+                    tg_notification.send_tg_message(message)
                 return "skip"
 
             # Находим файл с самой поздней датой изменения
@@ -227,7 +247,13 @@ class ValidationFn(service.sys_manager.ProcessManagement):
 
                 service.logger.logger_service.warning(
                     f"Запись об ФР №{serial_number}, не найдена в файле '{latest_file}'")
-                self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
+                disable_check_fr = self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
+
+                if self.notification_enabled == True and disable_check_fr == True:
+                    service.logger.logger_service.info("Уведомление об удалении будет отправлено в ТГ")
+                    message = (f"Не удалось проверить ФР №{serial_number} более '{self.delete_days}' дней, "
+                               f"дальнейшая проверка будет отключена до следующего успешного подключения к ФР.")
+                    tg_notification.send_tg_message(message)
                 return "skip"
 
             elif model_kkt == "mitsu":
@@ -272,7 +298,13 @@ class ValidationFn(service.sys_manager.ProcessManagement):
 
                 service.logger.logger_service.warning(
                     f"Запись об ФР №{serial_number} или соответствующем ФН не найдена в файле '{latest_file}'")
-                self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
+                disable_check_fr = self.disable_check_fr(get_current_time, validation_date, serial_number, i, model_kkt)
+
+                if self.notification_enabled == True and disable_check_fr == True:
+                    service.logger.logger_service.info("Уведомление об удалении будет отправлено в ТГ")
+                    message = (f"Не удалось проверить ФР №{serial_number} более '{self.delete_days}' дней, "
+                               f"дальнейшая проверка будет отключена до следующего успешного подключения к ФР.")
+                    tg_notification.send_tg_message(message)
                 return "skip"
 
         except Exception:
@@ -306,11 +338,14 @@ class ValidationFn(service.sys_manager.ProcessManagement):
             message = (f"ФР №{serial_number} больше не соответствует ФН №{fn_serial}, "
                        f"актуальный для него ФН №{log_fn}.\nСистема будете перезагружена "
                        f"через {self.hh}ч. {self.mm}м.")
-            service.tg_notification.send_tg_message(message)
+            tg_notification.send_tg_message(message)
         return False
 
     def fn_check_process(self, service_instance):
         self.get_fiscals_json()
+
+        if self.notification_enabled == True:
+            tg_notification.authentication_data()
 
         interval = 3600000 * self.interval_in_hours
 
@@ -344,12 +379,15 @@ class ValidationFn(service.sys_manager.ProcessManagement):
 
                     self.remove_empty_serials_from_file(model_kkt)
 
+                if sending_data.sending_data_enabled == True:
+                    sending_data.authentication_data()
+                    sending_data.send_fiscals_data()
+
                 if reboot_flag == 0:
                     process_not_found = self.check_process_cycle(self.updater_name, kill_process=True)
                     if process_not_found:
                         self.subprocess_run("updater", self.updater_name)
-
-                if reboot_flag == 1:
+                else:
                     if self.target_time == 0:
                         self.subprocess_run("_resources", self.reboot_file)
                     else:

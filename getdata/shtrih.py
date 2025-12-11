@@ -35,8 +35,6 @@ class ShtrihData(service.sys_manager.ProcessManagement):
             for device in self.fiscals_data[model_kkt]:
                 if device.get('serialNumber'):
                     registered_serials.append(device.get('serialNumber'))
-        service.logger.logger_service.debug(
-            f"Список json, данные из которых присутствуют в базе: {registered_serials}")
 
         # Отфильтровываем файлы, содержащие любые серийные номера из fiscals.json
         unregistered_files = [f for f in all_json_files if

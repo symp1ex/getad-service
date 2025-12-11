@@ -1,6 +1,5 @@
 import service.logger
 import service.configs
-import service.tg_notification
 import about
 import os
 import subprocess
@@ -12,10 +11,12 @@ import hashlib
 from datetime import datetime
 import win32api
 import shutil
+from cryptography.fernet import Fernet
 
 rm_date_flag = 0
 
 class ResourceManagement:
+    crypto_key = b't_qxC_HN04Tiy1ish2P27ROYSJt_m7_FE2JT6gYngOM='
     config_file = "service.json"
     resource_path = "_resources"
     date_path = os.path.join(about.current_path, "date")
@@ -32,6 +33,9 @@ class ResourceManagement:
         self.updater_name = self.config.get("service", {}).get("updater_name", "updater.exe")
         self.reboot_file = self.config.get("service", {}).get("reboot_file", "reboot.bat")
 
+        try: self.sending_data_enabled = int(self.config.get("sending_data", {}).get('enabled', 0))
+        except: self.sending_data_enabled = 0
+
         try: self.notification_enabled = int(self.config.get("notification", {}).get('enabled', 0))
         except: self.notification_enabled = 0
 
@@ -43,6 +47,14 @@ class ResourceManagement:
     def get_fiscals_json(self):
         self.fiscals_data = service.configs.read_config_file(about.current_path, self.fiscals_file,
                                                              {"atol":[],"mitsu":[],"shtrih":[]}, create=True)
+
+    def decrypt_data(self, encrypted_data):
+        try:
+            cipher = Fernet(self.crypto_key)
+            decrypted_data = cipher.decrypt(encrypted_data).decode()
+            return decrypted_data
+        except Exception:
+            service.logger.logger_service.error("Не удалось дешифровать данные для аутентификации", exc_info=True)
 
     def update_correlation_fiscals(self, serialNumber, fn_serial, get_current_time, model_kkt):
         self.get_fiscals_json()
@@ -98,14 +110,11 @@ class ResourceManagement:
                 except Exception:
                     service.logger.logger_service.error(f"Не удалось удалить файл '{json_path}'",
                                                         exc_info=True)
-
-                if self.notification_enabled == True:
-                    service.logger.logger_service.info("Уведомление об удалении будет отправлено в ТГ")
-                    message = (f"Не удалось проверить ФР №{serial_number} более '{self.delete_days}' дней, "
-                               f"дальнейшая проверка будет отключена до следующего успешного подключения к ФР.")
-                    service.tg_notification.send_tg_message(message)
+                return True
+            return False
         except Exception:
             service.logger.logger_service.error(f"Не удалось отключить проверку ФР№{serial_number}", exc_info=True)
+            return False
 
     def remove_empty_serials_from_file(self, model_kkt):
         self.get_fiscals_json()

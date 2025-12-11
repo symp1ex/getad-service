@@ -5,6 +5,16 @@
         "log_level": "info",
         "log_days": 7
     },
+	"sending_data": {
+        "enabled": false,
+        "authentication": {
+            "encryption": false,
+            "url": "",
+            "api_key": ""
+        },
+        "max_attempts": 5,
+        "delay": 10
+    },
     "validation_fn": {
         "enabled": true,
 		"forced": false,
