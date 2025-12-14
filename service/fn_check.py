@@ -72,8 +72,6 @@ class ValidationFn(service.sys_manager.ProcessManagement):
             try:
                 if model_kkt == "atol":
                     json_file["installed_driver"] = get_driver_version()
-                elif model_kkt == "mitsu":
-                    json_file["installed_driver"] = mitsu.get_driver_version()
 
                 json_file["url_rms"] = get_server_url()
                 json_file["vc"] = about.version
@@ -380,7 +378,7 @@ class ValidationFn(service.sys_manager.ProcessManagement):
                     self.remove_empty_serials_from_file(model_kkt)
 
                 if sending_data.sending_data_enabled == True:
-                    sending_data.authentication_data()
+                    service.logger.logger_service.info("Производится отправка данных на сервер")
                     sending_data.send_fiscals_data()
 
                 if reboot_flag == 0:

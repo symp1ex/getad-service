@@ -5,13 +5,15 @@
         "log_level": "info",
         "log_days": 7
     },
-	"sending_data": {
+    "sending_data": {
         "enabled": false,
-        "authentication": {
-            "encryption": false,
-            "url": "",
-            "api_key": ""
-        },
+        "url_list": [
+            {
+                "encryption": false,
+                "url": "https://server.com/api/submit_json",
+                "api_key": ""
+            }
+        ],
         "max_attempts": 5,
         "delay": 10
     },
@@ -50,4 +52,3 @@
         "delay": 10
     }
 }
-

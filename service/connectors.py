@@ -8,28 +8,20 @@ import os
 class SendingData(service.sys_manager.ResourceManagement):
     def __init__(self):
         super().__init__()
-        self.url = self.config.get("sending_data")["authentication"]["url"]
-        self.api_key = self.config.get("sending_data")["authentication"]["api_key"]
+        self.url_list = self.config.get("sending_data")["url_list"]
+        self.delay = None
 
-        try: self.encryption_enabled = int(self.config["sending_data"]["authentication"].get("encryption", 1))
-        except Exception: self.encryption_enabled = 1
-
-        try: self.max_attempts = int(self.config["sending_data"].get("max_attempts", 5))
+        try: self.max_attempts = int(self.config.get("sending_data", {}).get("max_attempts", 5))
         except Exception: self.max_attempts = 5
 
-        try: self.delay = int(self.config["sending_data"].get("delay", 10))
-        except Exception: self.delay = 10
 
-    def authentication_data(self):
+    def authentication_data(self, url_value, api_key_value, index):
         try:
-            if self.encryption_enabled == True:
-                self.url = self.decrypt_data(self.url)
-                self.api_key = self.decrypt_data(self.api_key)
-                service.logger.connectors.info(
-                    "Пользовательские данные для подключения к API-серверу успешно расшифрованы")
-                return
-            service.logger.connectors.warning(
-                "Шифрование пользовательских данных для подключения к API-серверу отключено")
+            url = self.decrypt_data(url_value)
+            api_key = self.decrypt_data(api_key_value)
+            service.logger.connectors.info(
+                f"Пользовательские данные для подключения к API сервера [{index}] успешно расшифрованы")
+            return url, api_key
         except Exception:
             service.logger.connectors.error("Не удалось дешифровать данные для подключения к API", exc_info=True)
 
@@ -42,35 +34,52 @@ class SendingData(service.sys_manager.ResourceManagement):
             for json_files in all_json_files:
                 json_data = service.configs.read_config_file(self.date_path, json_files, "")
 
-                for attempt in range(self.max_attempts):
-                    try:
-                        service.logger.connectors.info(f"Делаем запрос к API-сервера на отправку '{json_files}'")
-                        service.logger.connectors.debug(json_data)
+                for index, item in enumerate(self.url_list):
+                    encryption_value = item['encryption']
+                    url_value = item['url']
+                    api_key_value = item['api_key']
 
-                        # Заголовки
-                        headers = {
-                            'Content-Type': 'application/json',
-                            'X-API-Key': self.api_key
-                        }
+                    service.logger.connectors.debug(f"Получены данные для подключения к API сервера [{index}]: {item}")
+                    if encryption_value == True:
+                        url_value, api_key_value = self.authentication_data(url_value, api_key_value, index)
+                    else:
+                        service.logger.connectors.warning(
+                            f"Шифрование пользовательских данных для подключения к API сервера [{index}] отключено")
 
-                        # Отправка запроса
-                        response = requests.post(self.url, headers=headers, json=json_data)
+                    try: self.delay = int(self.config.get("sending_data", {}).get("delay", 10))
+                    except Exception: self.delay = 10
 
-                        # Проверка ответа
-                        service.logger.connectors.info(f"Статус ответа: {response.status_code}")
-                        service.logger.connectors.debug(f"Ответ: {response.json()}")
-                        break
-                    except Exception:
-                        current_attempt = attempt + 1
-                        if attempt < self.max_attempts - 1:
-                            service.logger.connectors.warning(
-                                f"Попытка ({current_attempt}) отправить данные не удалась. "
-                                f"Повторная попытка через ({self.delay}) секунд")
-                            time.sleep(self.delay)
-                            self.delay *= 2
-                            continue
-                        service.logger.connectors.error(
-                            f"Не удалось отправить {json_files} на сервер после ({self.max_attempts}) попыток", exc_info=True)
+                    for attempt in range(self.max_attempts):
+                        try:
+                            service.logger.connectors.info(
+                                f"Делаем запрос к API-сервера [{index}] на отправку '{json_files}'")
+                            service.logger.connectors.debug(json_data)
+
+                            # Заголовки
+                            headers = {
+                                'Content-Type': 'application/json',
+                                'X-API-Key': api_key_value
+                            }
+
+                            # Отправка запроса
+                            response = requests.post(url_value, headers=headers, json=json_data)
+
+                            # Проверка ответа
+                            service.logger.connectors.info(f"Статус ответа: {response.status_code}")
+                            service.logger.connectors.debug(f"Ответ: {response.json()}")
+                            break
+                        except Exception:
+                            current_attempt = attempt + 1
+                            if attempt < self.max_attempts - 1:
+                                service.logger.connectors.warning(
+                                    f"Попытка ({current_attempt}) отправить данные не удалась. "
+                                    f"Повторная попытка через ({self.delay}) секунд")
+                                time.sleep(self.delay)
+                                self.delay *= 2
+                                continue
+                            service.logger.connectors.error(
+                                f"Не удалось отправить {json_files} на сервер после ({self.max_attempts}) попыток",
+                                exc_info=True)
         except Exception:
             service.logger.connectors.error(
                 f"Попытка отправить данные на сервер завершилась неудачей", exc_info=True)

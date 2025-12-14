@@ -51,7 +51,7 @@ def run_without_arguments():
                 shtrihscanner.subprocess_kill("", shtrihscanner.exe_name)
 
         if sending_data.sending_data_enabled == True:
-            sending_data.authentication_data()
+            service.logger.logger_service.info("Производится отправка данных на сервер")
             sending_data.send_fiscals_data()
 
         process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, count_attempt=120)
@@ -115,7 +115,7 @@ class Service(win32serviceutil.ServiceFramework):
                 validation_fn.fn_check_process(self)
             else:
                 if sending_data.sending_data_enabled == True:
-                    sending_data.authentication_data()
+                    service.logger.logger_service.info("Производится отправка данных на сервер")
                     sending_data.send_fiscals_data()
 
                 process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, kill_process=True)

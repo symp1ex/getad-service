@@ -48,11 +48,13 @@ service_data = {
     },
     "sending_data": {
         "enabled": False,
-        "authentication": {
-            "encryption": False,
-            "url": "",
-            "api_key": ""
-        },
+        "url_list": [
+            {
+                "encryption": False,
+                "url": "https://server.com/api/submit_json",
+                "api_key": ""
+            }
+        ],
         "max_attempts": 5,
         "delay": 10
     },
