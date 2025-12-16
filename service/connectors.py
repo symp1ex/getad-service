@@ -31,20 +31,20 @@ class SendingData(service.sys_manager.ResourceManagement):
             service.logger.connectors.info("Получен список файлов для отправки на сервер")
             service.logger.connectors.debug(all_json_files)
 
-            for json_files in all_json_files:
-                json_data = service.configs.read_config_file(self.date_path, json_files, "")
+            for index, item in enumerate(self.url_list):
+                encryption_value = item['encryption']
+                url_value = item['url']
+                api_key_value = item['api_key']
 
-                for index, item in enumerate(self.url_list):
-                    encryption_value = item['encryption']
-                    url_value = item['url']
-                    api_key_value = item['api_key']
+                service.logger.connectors.debug(f"Получены данные для подключения к API сервера [{index}]: {item}")
+                if encryption_value == True:
+                    url_value, api_key_value = self.authentication_data(url_value, api_key_value, index)
+                else:
+                    service.logger.connectors.warning(
+                        f"Шифрование пользовательских данных для подключения к API сервера [{index}] отключено")
 
-                    service.logger.connectors.debug(f"Получены данные для подключения к API сервера [{index}]: {item}")
-                    if encryption_value == True:
-                        url_value, api_key_value = self.authentication_data(url_value, api_key_value, index)
-                    else:
-                        service.logger.connectors.warning(
-                            f"Шифрование пользовательских данных для подключения к API сервера [{index}] отключено")
+                for json_files in all_json_files:
+                    json_data = service.configs.read_config_file(self.date_path, json_files, "")
 
                     try: self.delay = int(self.config.get("sending_data", {}).get("delay", 10))
                     except Exception: self.delay = 10
