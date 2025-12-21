@@ -6,7 +6,6 @@ from getdata.get_remote import get_server_url, get_teamviewer_id, get_anydesk_id
 import about
 import json
 import os
-import shutil
 
 processmanager = service.sys_manager.ProcessManagement()
 
@@ -116,6 +115,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
     except Exception:
         service.logger.logger_getad.error(f"Не удалось сделать запрос к ФР", exc_info=True)
         attribute_marked = "Не поддерживается в текущей версии драйвера"
+        address = "Не поддерживается в текущей версии драйвера"
 
     # запрос общей инфы из ФН
     try:
