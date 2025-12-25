@@ -72,9 +72,12 @@ class ValidationFn(service.sys_manager.ProcessManagement):
             try:
                 if model_kkt == "atol":
                     json_file["installed_driver"] = get_driver_version()
+                elif model_kkt == "mitsu":
+                    json_file["installed_driver"] = str(mitsu.get_driver_version())
 
                 json_file["url_rms"] = get_server_url()
                 json_file["vc"] = about.version
+                json_file["uuid"] = self.get_uuid()
                 service.configs.write_json_file(json_file, json_path)
             except Exception:
                 service.logger.logger_service.warn(f"Не удалось обновить '{os.path.abspath(json_path)}'", exc_info=True)

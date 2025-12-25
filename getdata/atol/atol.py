@@ -365,7 +365,10 @@ def get_atol_data():
             elif not port_number_ad == {}:
                 service.logger.logger_getad.info(f"Найдены порты: {port_number_ad}")
             baud_rate = config["atol"][0].get("com_baudrate", "115200")
+
             check_delete = 0
+            check_create_json = 0
+
             for port in port_number_ad.values():
                 settings = "{{\"{}\": {}, \"{}\": {}, \"{}\": \"{}\", \"{}\": {}}}".format(
                     IFptr.LIBFPTR_SETTING_MODEL, IFptr.LIBFPTR_MODEL_ATOL_AUTO,
@@ -382,6 +385,10 @@ def get_atol_data():
                         processmanager.rm_old_date()
                         check_delete = 1
                     get_date_kkt(fptr, IFptr, port, installed_version)
+                    check_create_json = 1
+                if check_create_json == 0:
+                    get_date_non_kkt()
+                    check_create_json = 1
         else:
             port = connect_kkt(fptr, IFptr, 0)  # подключаемся к ККТ
             isOpened = status_connect(fptr, port)
@@ -392,3 +399,4 @@ def get_atol_data():
                 get_date_non_kkt()
     except Exception:
         service.logger.logger_getad.error(f"Не удалось подключиться к ККТ", exc_info=True)
+        
