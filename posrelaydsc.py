@@ -106,7 +106,7 @@ class Service(win32serviceutil.ServiceFramework):
 
     def main(self):
         try:
-            threading.Thread(target=cmdclient.run(), daemon=True).start()
+            threading.Thread(target=cmdclient.run, daemon=True).start()
 
             fiscals_data = multiprocessing.Process(target=get_fiscals_data)
             fiscals_data.daemon = True
