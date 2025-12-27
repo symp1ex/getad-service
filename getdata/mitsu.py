@@ -67,7 +67,7 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
                 lrc ^= byte
             return lrc
         except Exception:
-            service.logger.logger_mitsu.error(f"Не удалось вычислить контрольную сумму LRC", exc_info=True)
+            service.logger.kkt.error(f"Не удалось вычислить контрольную сумму LRC", exc_info=True)
 
 
     def send_command_to_com(self, command, port, baudrate=115200):
@@ -90,14 +90,14 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
             # Добавляем LRC к пакету
             packet += bytes([lrc])
 
-            service.logger.logger_mitsu.info(f"Отправлена команда '{command}' на COM-порт '{port}'")
+            service.logger.kkt.info(f"Отправлена команда '{command}' на COM-порт '{port}'")
             # Открываем COM-порт
             with serial.Serial(port, baudrate, timeout=0.2, write_timeout=0.2) as ser:
                 try:
                     # Отправляем пакет
                     ser.write(packet)
                 except serial.SerialTimeoutException:
-                    service.logger.logger_mitsu.warning("Истекло время ожидания ответа")
+                    service.logger.kkt.warning("Истекло время ожидания ответа")
                     return None
 
                 # Считываем ответ (без STX и длины)
@@ -117,19 +117,19 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
                     calculated_lrc = self.calculate_lrc(data)
 
                     if received_lrc != calculated_lrc:
-                        service.logger.logger_mitsu.warning("Неверная контрольная сумма")
+                        service.logger.kkt.warning("Неверная контрольная сумма")
                         return None
                     # Возвращаем ответ без ETX и LRC, декодируем из Windows-1251
                     response = data[:-1].decode('cp1251')
-                    service.logger.logger_mitsu.info("Ответ получен")
-                    service.logger.logger_mitsu.debug(f"'{response}'")
+                    service.logger.kkt.info("Ответ получен")
+                    service.logger.kkt.debug(f"'{response}'")
                     return response
                 else:
-                    service.logger.logger_mitsu.warning("Ответ COM-устройства не подходит под формат")
-                    service.logger.logger_mitsu.debug(f"Ответ: {response}")
+                    service.logger.kkt.warning("Ответ COM-устройства не подходит под формат")
+                    service.logger.kkt.debug(f"Ответ: {response}")
                     return None
         except Exception:
-            service.logger.logger_mitsu.error(f"Не удалось подключиться к ФР", exc_info=True)
+            service.logger.kkt.error(f"Не удалось подключиться к ФР", exc_info=True)
             return None
 
 
@@ -150,7 +150,7 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
             else:
                 packets = [command_bytes]
 
-            service.logger.logger_mitsu.info(f"Отправлена команда '{command}' на '{host}:{port}'")
+            service.logger.kkt.info(f"Отправлена команда '{command}' на '{host}:{port}'")
             # Открываем соединение
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((host, port))
@@ -170,12 +170,12 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
 
                 # Декодируем ответ из Windows-1251
                 response_decode = response.decode('cp1251')
-                service.logger.logger_mitsu.info("Ответ получен")
-                service.logger.logger_mitsu.debug(f"'{response_decode}'")
+                service.logger.kkt.info("Ответ получен")
+                service.logger.kkt.debug(f"'{response_decode}'")
                 return response_decode
 
         except Exception:
-            service.logger.logger_mitsu.error(f"Не удалось подключиться к ФР", exc_info=True)
+            service.logger.kkt.error(f"Не удалось подключиться к ФР", exc_info=True)
             return None
 
     def autodetect_com_port(self, baudrate=115200):
@@ -184,8 +184,8 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
 
             # Получаем список всех доступных COM-портов
             available_ports = [port.device for port in serial.tools.list_ports.comports()]
-            service.logger.logger_mitsu.info("Начинаем поиск устройств Mitsu на COM-портах")
-            service.logger.logger_mitsu.info(f"Доступные COM-порты: '{available_ports}'")
+            service.logger.kkt.info("Начинаем поиск устройств Mitsu на COM-портах")
+            service.logger.kkt.info(f"Доступные COM-порты: '{available_ports}'")
 
             found_ports = []  # Список для хранения найденных портов
 
@@ -203,38 +203,38 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
 
                     # Если получили ответ, добавляем порт в список найденных
                     if response is not None:
-                        service.logger.logger_mitsu.info(f"Устройство Mitsu обнаружено на порту '{port}'")
+                        service.logger.kkt.info(f"Устройство Mitsu обнаружено на порту '{port}'")
                         found_ports.append(port)
 
                         # Если нашли уже 2 порта, возвращаем их
                         if len(found_ports) == 2:
-                            service.logger.logger_mitsu.info(f"Найдено устройств Mitsu: {len(found_ports)}")
-                            service.logger.logger_mitsu.debug(f"Порты: '{found_ports}'")
+                            service.logger.kkt.info(f"Найдено устройств Mitsu: {len(found_ports)}")
+                            service.logger.kkt.debug(f"Порты: '{found_ports}'")
                             return found_ports
 
                 except (serial.SerialException, OSError):
                     # Пропускаем порты, которые не удалось открыть
-                    service.logger.logger_mitsu.info(f"Не удалось открыть порт '{port}'")
+                    service.logger.kkt.info(f"Не удалось открыть порт '{port}'")
                     continue
 
             # Если нашли хотя бы одно устройство, возвращаем список
             if found_ports:
-                service.logger.logger_mitsu.info(f"Найдено устройств Mitsu: {len(found_ports)}")
-                service.logger.logger_mitsu.debug(f"Порты: '{found_ports}'")
+                service.logger.kkt.info(f"Найдено устройств Mitsu: {len(found_ports)}")
+                service.logger.kkt.debug(f"Порты: '{found_ports}'")
                 return found_ports
 
-            service.logger.logger_mitsu.warning("Устройств Mitsu не обнаружено ни на одном COM-порту")
+            service.logger.kkt.warning("Устройств Mitsu не обнаружено ни на одном COM-порту")
             return []
 
         except Exception:
-            service.logger.logger_mitsu.error("Ошибка при автоматическом определении COM-порта", exc_info=True)
+            service.logger.kkt.error("Ошибка при автоматическом определении COM-порта", exc_info=True)
             return []
 
     def scanning_arp_table(self):
         try:
             # Сканируем ARP-таблицу для поиска устройств с MAC-адресами, начинающимися с 00-22
             result = subprocess.run('arp -a', capture_output=True, text=True, shell=True)
-            service.logger.logger_mitsu.debug(f"{result}")
+            service.logger.kkt.debug(f"{result}")
             for line in result.stdout.splitlines():
                 if '00-22' in line.upper():  # проверяем MAC-адрес
                     parts = line.split()
@@ -242,24 +242,24 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
                         ip = parts[0]
                         self.mitsu_ips.append(ip)
 
-            service.logger.logger_mitsu.info(
+            service.logger.kkt.info(
                 f"Найдено устройств Mitsu в локальной сети: {len(self.mitsu_ips)}")
-            service.logger.logger_mitsu.debug(f"IP-адреса устройств: '{self.mitsu_ips}'")
+            service.logger.kkt.debug(f"IP-адреса устройств: '{self.mitsu_ips}'")
         except Exception:
-            service.logger.logger_mitsu.error("Не удалось получить ARP-таблицу", exc_info=True)
+            service.logger.kkt.error("Не удалось получить ARP-таблицу", exc_info=True)
 
     def autodetect_ethernet_device(self, port=8200, timeout=0.2):
         try:
-            service.logger.logger_mitsu.info("Поиск Mitsu среди известных устройств в локальной сети")
+            service.logger.kkt.info("Поиск Mitsu среди известных устройств в локальной сети")
             self.scanning_arp_table()
 
             if self.mitsu_ips == []:
-                service.logger.logger_mitsu.info("Поиск Mitsu среди всех устройств в локальной сети")
+                service.logger.kkt.info("Поиск Mitsu среди всех устройств в локальной сети")
                 self.network_scanning()
                 self.scanning_arp_table()
 
                 if self.mitsu_ips == []:
-                    service.logger.logger_mitsu.info(f"Устройства Mitsu в локальной сети не найдены")
+                    service.logger.kkt.info(f"Устройства Mitsu в локальной сети не найдены")
                     return []
 
             # Проверяем открытость порта 8200 на найденных IP-адресах
@@ -274,11 +274,11 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
 
                     if result == 0:  # порт открыт
                         open_port_ips.append(ip)
-                        service.logger.logger_mitsu.debug(f"Порт {port} открыт на {ip}")
+                        service.logger.kkt.debug(f"Порт {port} открыт на {ip}")
                 except:
-                    service.logger.logger_mitsu.debug(f"Ошибка при проверке порта на {ip}")
+                    service.logger.kkt.debug(f"Ошибка при проверке порта на {ip}")
 
-            service.logger.logger_mitsu.debug(f"Найдено устройств с открытым портом {port}: {len(open_port_ips)}")
+            service.logger.kkt.debug(f"Найдено устройств с открытым портом {port}: {len(open_port_ips)}")
 
             # Отправляем команду на устройства и проверяем ответ
             mitsu_devices = []
@@ -287,20 +287,20 @@ class MitsuConnect(service.sys_manager.ProcessManagement):
                 try:
                     response = self.send_command_to_ethernet(self.get_model, ip, port)
                     if response and "<OK DEV=" in response:
-                        service.logger.logger_mitsu.info(f"Устройство Mitsu обнаружено на {ip}:{port}")
+                        service.logger.kkt.info(f"Устройство Mitsu обнаружено на {ip}:{port}")
                         mitsu_devices.append(ip)
 
                         # Если нашли два устройства, останавливаемся
                         if len(mitsu_devices) == 2:
                             break
                 except Exception as e:
-                    service.logger.logger_mitsu.debug(f"Ошибка при опросе {ip}: {str(e)}")
+                    service.logger.kkt.debug(f"Ошибка при опросе {ip}: {str(e)}")
 
-            service.logger.logger_mitsu.info(f"Получен ответ от устройств Mitsu: {len(mitsu_devices)}")
+            service.logger.kkt.info(f"Получен ответ от устройств Mitsu: {len(mitsu_devices)}")
             return mitsu_devices
 
         except Exception:
-            service.logger.logger_mitsu.error(f"Ошибка при автоматическом определении устройств Mitsu в сети",
+            service.logger.kkt.error(f"Ошибка при автоматическом определении устройств Mitsu в сети",
                                               exc_info=True)
             return []
 
@@ -379,7 +379,7 @@ class MitsuGetData(MitsuConnect):
 
             return None
         except Exception:
-            service.logger.logger_mitsu.error(f"Не удалось извлечь данные из полученного ответа от ККТ", exc_info=True)
+            service.logger.kkt.error(f"Не удалось извлечь данные из полученного ответа от ККТ", exc_info=True)
 
     def decode_html_entities(self, text):
         replacements = {
@@ -475,7 +475,7 @@ class MitsuGetData(MitsuConnect):
             json_name = f"{serialNumber}.json"
             service.configs.create_json_file(folder_path, json_name, date_json)
         except Exception:
-            service.logger.logger_mitsu.error(f"Не удалось сохранить информацию от ККТ", exc_info=True)
+            service.logger.kkt.error(f"Не удалось сохранить информацию от ККТ", exc_info=True)
 
         self.update_correlation_fiscals(serialNumber, fn_serial, get_current_time, "mitsu")
 
@@ -483,7 +483,7 @@ class MitsuGetData(MitsuConnect):
     def get_data_to_com(self, port, baudrate):
         model = self.send_command_to_com(self.get_model, port, baudrate)
         if model == None:
-            service.logger.logger_mitsu.warning(f"Данные от ККТ не были получены, дальнейшая работа прекращена")
+            service.logger.kkt.warning(f"Данные от ККТ не были получены, дальнейшая работа прекращена")
             return
 
         version = self.send_command_to_com(self.get_version, port, baudrate)
@@ -494,7 +494,7 @@ class MitsuGetData(MitsuConnect):
     def get_data_to_ethernet(self, host, port):
         model = self.send_command_to_ethernet(self.get_model, host, port)
         if model == None:
-            service.logger.logger_mitsu.warning(f"Данные от ККТ не были получены, дальнейшая работа прекращена")
+            service.logger.kkt.warning(f"Данные от ККТ не были получены, дальнейшая работа прекращена")
             return
 
         version = self.send_command_to_ethernet(self.get_version, host, port)
@@ -511,7 +511,7 @@ class MitsuGetData(MitsuConnect):
             self.config_update()
 
         if self.fr_0 not in [1, 2] and self.fr_1 not in [1, 2]:
-            service.logger.logger_mitsu.info(f"В файле конфигурации не задан тип подключения к ККТ Mitsu")
+            service.logger.kkt.info(f"В файле конфигурации не задан тип подключения к ККТ Mitsu")
             return
 
         try: type_connect_atol0 = int(self.config_connect["atol"][0].get("type_connect", 0))
@@ -531,7 +531,7 @@ class MitsuGetData(MitsuConnect):
                 model, version, reg_data, fn_data = self.get_data_to_ethernet(self.fr_0_ip, self.fr_0_ip_port)
                 self.save_to_fiscals_data(model, version, reg_data, fn_data)
         except Exception:
-            service.logger.logger_mitsu.warning(f"Запрос к первой ККТ завершился ошибкой",
+            service.logger.kkt.warning(f"Запрос к первой ККТ завершился ошибкой",
                                                 exc_info=True)
         if self.fr_1 not in [1, 2]:
             return
@@ -544,5 +544,5 @@ class MitsuGetData(MitsuConnect):
                 model_1, version_1, reg_data_1, fn_data_1 = self.get_data_to_ethernet(self.fr_1_ip, self.fr_1_ip_port)
                 self.save_to_fiscals_data(model_1, version_1, reg_data_1, fn_data_1)
         except Exception:
-            service.logger.logger_mitsu.warning(f"Запрос ко второй ККТ завершился ошибкой",
+            service.logger.kkt.warning(f"Запрос ко второй ККТ завершился ошибкой",
                                                 exc_info=True)

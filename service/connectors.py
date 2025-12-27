@@ -19,28 +19,28 @@ class SendingData(service.sys_manager.ResourceManagement):
         try:
             url = self.decrypt_data(url_value)
             api_key = self.decrypt_data(api_key_value)
-            service.logger.connectors.info(
+            service.logger.logger_service.info(
                 f"Пользовательские данные для подключения к API сервера [{index}] успешно расшифрованы")
             return url, api_key
         except Exception:
-            service.logger.connectors.error("Не удалось дешифровать данные для подключения к API", exc_info=True)
+            service.logger.logger_service.error("Не удалось дешифровать данные для подключения к API", exc_info=True)
 
     def send_fiscals_data(self):
         try:
             all_json_files = [f for f in os.listdir(self.date_path) if f.endswith('.json')]
-            service.logger.connectors.info("Получен список файлов для отправки на сервер")
-            service.logger.connectors.debug(all_json_files)
+            service.logger.logger_service.info("Получен список файлов для отправки на сервер")
+            service.logger.logger_service.debug(all_json_files)
 
             for index, item in enumerate(self.url_list):
                 encryption_value = item['encryption']
                 url_value = item['url']
                 api_key_value = item['api_key']
 
-                service.logger.connectors.debug(f"Получены данные для подключения к API сервера [{index}]: {item}")
+                service.logger.logger_service.debug(f"Получены данные для подключения к API сервера [{index}]: {item}")
                 if encryption_value == True:
                     url_value, api_key_value = self.authentication_data(url_value, api_key_value, index)
                 else:
-                    service.logger.connectors.warning(
+                    service.logger.logger_service.warning(
                         f"Шифрование пользовательских данных для подключения к API сервера [{index}] отключено")
 
                 for json_files in all_json_files:
@@ -51,9 +51,9 @@ class SendingData(service.sys_manager.ResourceManagement):
 
                     for attempt in range(self.max_attempts):
                         try:
-                            service.logger.connectors.info(
+                            service.logger.logger_service.info(
                                 f"Делаем запрос к API-сервера [{index}] на отправку '{json_files}'")
-                            service.logger.connectors.debug(json_data)
+                            service.logger.logger_service.debug(json_data)
 
                             # Заголовки
                             headers = {
@@ -65,23 +65,23 @@ class SendingData(service.sys_manager.ResourceManagement):
                             response = requests.post(url_value, headers=headers, json=json_data)
 
                             # Проверка ответа
-                            service.logger.connectors.info(f"Статус ответа: {response.status_code}")
-                            service.logger.connectors.debug(f"Ответ: {response.json()}")
+                            service.logger.logger_service.info(f"Статус ответа: {response.status_code}")
+                            service.logger.logger_service.debug(f"Ответ: {response.json()}")
                             break
                         except Exception:
                             current_attempt = attempt + 1
                             if attempt < self.max_attempts - 1:
-                                service.logger.connectors.warning(
+                                service.logger.logger_service.warning(
                                     f"Попытка ({current_attempt}) отправить данные не удалась. "
                                     f"Повторная попытка через ({self.delay}) секунд")
                                 time.sleep(self.delay)
                                 self.delay *= 2
                                 continue
-                            service.logger.connectors.error(
+                            service.logger.logger_service.error(
                                 f"Не удалось отправить {json_files} на сервер после ({self.max_attempts}) попыток",
                                 exc_info=True)
         except Exception:
-            service.logger.connectors.error(
+            service.logger.logger_service.error(
                 f"Попытка отправить данные на сервер завершилась неудачей", exc_info=True)
 
 
@@ -105,17 +105,17 @@ class TelegramNotification(service.sys_manager.ResourceManagement):
             if self.encryption_enabled == True:
                 self.bot_token = self.decrypt_data(self.bot_token)
                 self.chat_id = self.decrypt_data(self.chat_id)
-                service.logger.connectors.info(
+                service.logger.logger_service.info(
                     "Пользовательские данные для отправки уведомлений в Telegram успешно расшифрованы")
                 return
-            service.logger.connectors.warning(
+            service.logger.logger_service.warning(
                 "Шифрование пользовательских данных для отправки уведомлений в Telegram отключено")
         except Exception:
-            service.logger.connectors.error("Не удалось дешифровать данные для подключения к боту", exc_info=True)
+            service.logger.logger_service.error("Не удалось дешифровать данные для подключения к боту", exc_info=True)
 
     def request_tg_message(self, full_message):
-        service.logger.connectors.info("Сделан запрос на отправку уведомления в Telegram")
-        service.logger.connectors.debug(f"\n\n{full_message}")
+        service.logger.logger_service.info("Сделан запрос на отправку уведомления в Telegram")
+        service.logger.logger_service.debug(f"\n\n{full_message}")
         for attempt in range(self.max_attempts):
             try:
                 url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
@@ -128,26 +128,26 @@ class TelegramNotification(service.sys_manager.ResourceManagement):
                 result = response.json()
 
                 # Вывод полного ответа API
-                service.logger.connectors.debug("Ответ от API Telegram:")
-                service.logger.connectors.debug(result)
+                service.logger.logger_service.debug("Ответ от API Telegram:")
+                service.logger.logger_service.debug(result)
 
                 # Проверка статуса отправки
                 if result.get('ok'):
-                    service.logger.connectors.info("Уведомление в Telegram успешно отправлено")
+                    service.logger.logger_service.info("Уведомление в Telegram успешно отправлено")
                 else:
-                    service.logger.connectors.error(f"Не удалось отправить уведомление: {result.get('description')}")
+                    service.logger.logger_service.error(f"Не удалось отправить уведомление: {result.get('description')}")
 
                 return result
             except Exception:
                 current_attempt = attempt + 1
                 if attempt < self.max_attempts - 1:
-                    service.logger.connectors.warning(
+                    service.logger.logger_service.warning(
                         f"Попытка ({current_attempt}) отправить уведомление не удалась. "
                         f"Повторная попытка через ({self.delay}) секунд")
                     time.sleep(self.delay)
                     self.delay *= 2
                     continue
-                service.logger.connectors.error(
+                service.logger.logger_service.error(
                     f"Не удалось сделать запрос к API Telegram после ({self.max_attempts}) попыток", exc_info=True)
 
     def send_tg_message(self, message):

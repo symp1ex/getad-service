@@ -1,0 +1,10 @@
+__pycache__/
+.idea/
+.venv/
+logs/
+date/
+updater/
+uuid
+*.json
+*.exe
+*.txt

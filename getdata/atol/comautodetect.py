@@ -1,13 +1,12 @@
 import service.logger
 import serial.tools.list_ports
-from datetime import datetime
 
 def get_com_ports():
     try:
         com_ports = serial.tools.list_ports.comports()
         return [(port.device, port.description) for port in com_ports]
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось получить список COM-портов", exc_info=True)
+        service.logger.kkt.error(f"Не удалось получить список COM-портов", exc_info=True)
 
 def get_list_atol():
     try:
@@ -18,10 +17,10 @@ def get_list_atol():
                 if 'ATOL' in description:
                     atol_ports.append(port)
         else:
-            service.logger.logger_getad.warn("COM-порты не найдены.")
+            service.logger.kkt.warn("COM-порты не найдены.")
         return atol_ports
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось получить список com-портов c 'ATOL' в названии", exc_info=True)
+        service.logger.kkt.error(f"Не удалось получить список com-портов c 'ATOL' в названии", exc_info=True)
 
 def get_atol_port_dict():
     try:
@@ -32,4 +31,4 @@ def get_atol_port_dict():
             atol_port_dict[f"port{i}"] = port
         return atol_port_dict
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось создать словарь со списком com-портов", exc_info=True)
+        service.logger.kkt.error(f"Не удалось создать словарь со списком com-портов", exc_info=True)

@@ -22,20 +22,20 @@ def file_exists_in_root(filename):
         root_path = os.path.join(os.getcwd(), filename)  # Получаем путь к файлу в корне
         return os.path.isfile(root_path)  # Возвращает True, если файл существует, иначе False
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось проверить наличие {filename}", exc_info=True)
+        service.logger.kkt.error(f"Не удалось проверить наличие {filename}", exc_info=True)
 
 def status_connect(fptr, port):
     try:
         isOpened = fptr.isOpened()  # спрашиваем состояние подключения
         if isOpened == 1:
-            service.logger.logger_getad.info(f"Соединение с ККТ установлено ({port})")
+            service.logger.kkt.info(f"Соединение с ККТ установлено ({port})")
             return isOpened
         elif isOpened == 0:
-            service.logger.logger_getad.info(f"Соединение с ККТ разорвано ({port})")
+            service.logger.kkt.info(f"Соединение с ККТ разорвано ({port})")
             del fptr
             return isOpened
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось проверить статус соединения", exc_info=True)
+        service.logger.kkt.error(f"Не удалось проверить статус соединения", exc_info=True)
 
 def checkstatus_getdate(fptr, IFptr, port, installed_version):
     try:
@@ -46,7 +46,7 @@ def checkstatus_getdate(fptr, IFptr, port, installed_version):
             del fptr
             return isOpened
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось получить данные из-за ошибки при проверке статуса подключения", exc_info=True)
+        service.logger.kkt.error(f"Не удалось получить данные из-за ошибки при проверке статуса подключения", exc_info=True)
 
 def connect_kkt(fptr, IFptr, index):
     try:
@@ -90,7 +90,7 @@ def connect_kkt(fptr, IFptr, index):
             ip_with_port = f"{connections[index].get('ip')}:{connections[index].get('ip_port')}"
             return settings.get(IFptr.LIBFPTR_SETTING_COM_FILE, None) or ip_with_port
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось установить соединение с ККТ", exc_info=True)
+        service.logger.kkt.error(f"Не удалось установить соединение с ККТ", exc_info=True)
 
 def get_date_kkt(fptr, IFptr, port, installed_version):
     try:
@@ -113,7 +113,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
         attribute_marked = fptr.getParamBool(IFptr.LIBFPTR_PARAM_TRADE_MARKED_PRODUCTS)
         address = fptr.getParamString(1009)
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось сделать запрос к ФР", exc_info=True)
+        service.logger.kkt.error(f"Не удалось сделать запрос к ФР", exc_info=True)
         attribute_marked = "Не поддерживается в текущей версии драйвера"
         address = "Не поддерживается в текущей версии драйвера"
 
@@ -127,7 +127,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
         # Используйте значение fn_execution здесь
     except Exception:
         # Обработка случая, когда атрибут LIBFPTR_PARAM_FN_EXECUTION отсутствует
-        service.logger.logger_getad.error(f"Не удалось сделать запрос к ФР", exc_info=True)
+        service.logger.kkt.error(f"Не удалось сделать запрос к ФР", exc_info=True)
         fnExecution = "Не поддерживается в текущей версии драйвера"
 
     # функция запроса даты регистрации, если регистрация была первой
@@ -147,7 +147,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
                 dateTime = fptr.getParamDateTime(IFptr.LIBFPTR_PARAM_DATE_TIME)
                 return dateTime
         except Exception:
-            service.logger.logger_getad.error(f"Не удалось сделать запрос к ФР", exc_info=True)
+            service.logger.kkt.error(f"Не удалось сделать запрос к ФР", exc_info=True)
 
     datetime_reg = datetime_reg_check(fptr)
 
@@ -215,9 +215,9 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
         status_connect(fptr, port)
         del fptr
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось сделать запрос к ФР", exc_info=True)
+        service.logger.kkt.error(f"Не удалось сделать запрос к ФР", exc_info=True)
 
-    service.logger.logger_getad.info(f"Данные от ККТ получены")
+    service.logger.kkt.info(f"Данные от ККТ получены")
 
     try:
         hostname, url_rms, teamviever_id, anydesk_id, litemanager_id = get_remote()
@@ -256,7 +256,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
         json_name = f"{serialNumber}.json"
         service.configs.create_json_file(folder_path, json_name, date_json)
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось сохранить информацию от ККТ", exc_info=True)
+        service.logger.kkt.error(f"Не удалось сохранить информацию от ККТ", exc_info=True)
 
     processmanager.update_correlation_fiscals(serialNumber, fn_serial, get_current_time, "atol")
 
@@ -291,7 +291,7 @@ def get_remote():
         #total_space_gb, free_space_gb = get_disk_info(drive)
         return hostname, url_rms, teamviever_id, anydesk_id, litemanager_id
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось получить данные с хоста", exc_info=True)
+        service.logger.kkt.error(f"Не удалось получить данные с хоста", exc_info=True)
 
 def get_atol_data():
     fptr10_path = os.path.join(about.current_path, "fptr10.dll")
@@ -300,11 +300,11 @@ def get_atol_data():
     try:
         from getdata.atol.libfptr108 import IFptr  # подтягиваем библиотеку от 10.8 и проверяем версию
         if file_exists_in_root(fptr10_path):
-            service.logger.logger_getad.info(f"Будет использоваться приоритетный файл библиотеки '{fptr10_path}'")
+            service.logger.kkt.info(f"Будет использоваться приоритетный файл библиотеки '{fptr10_path}'")
             try:
                 installed_version = get_driver_version()
             except Exception:
-                service.logger.logger_getad.error(f"Не удалось проверить версию установленного драйвера", exc_info=True)
+                service.logger.kkt.error(f"Не удалось проверить версию установленного драйвера", exc_info=True)
                 installed_version = "Error"
             fptr = IFptr(fptr10_path)
         else:
@@ -314,11 +314,11 @@ def get_atol_data():
 
         version_byte = fptr.version()
         version = version_byte.decode()
-        service.logger.logger_getad.info(f"Инициализирован драйвер версии {version}")
+        service.logger.kkt.info(f"Инициализирован драйвер версии {version}")
 
         parts = version.split('.')
         if len(parts) < 3:
-            service.logger.logger_getad.info("Некорректный формат версии")
+            service.logger.kkt.info("Некорректный формат версии")
             return None
 
         major, minor, patch, null = map(int, parts)
@@ -333,7 +333,7 @@ def get_atol_data():
     except ImportError:
         pass
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось инициализировать драйвер", exc_info=True)
+        service.logger.kkt.error(f"Не удалось инициализировать драйвер", exc_info=True)
 
     file_name = "connect.json"
     config = service.configs.read_config_file(about.current_path, file_name, service.configs.connect_data, create=True)
@@ -363,7 +363,7 @@ def get_atol_data():
             if not port_number_ad:
                 get_date_non_kkt()
             elif not port_number_ad == {}:
-                service.logger.logger_getad.info(f"Найдены порты: {port_number_ad}")
+                service.logger.kkt.info(f"Найдены порты: {port_number_ad}")
             baud_rate = config["atol"][0].get("com_baudrate", "115200")
 
             check_delete = 0
@@ -398,5 +398,5 @@ def get_atol_data():
             elif isOpened == 0:
                 get_date_non_kkt()
     except Exception:
-        service.logger.logger_getad.error(f"Не удалось подключиться к ККТ", exc_info=True)
+        service.logger.kkt.error(f"Не удалось подключиться к ККТ", exc_info=True)
         
