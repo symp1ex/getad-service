@@ -5,6 +5,7 @@ logs/
 date/
 updater/
 uuid
+main-temp.py
 *.json
 *.exe
 *.txt

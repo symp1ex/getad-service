@@ -6,6 +6,7 @@ import service.connectors
 import getdata.atol.atol
 import getdata.shtrih
 import getdata.mitsu
+import ra.cmdroute
 import about
 import win32serviceutil
 import win32service
@@ -16,11 +17,13 @@ import sys
 import os
 import time
 import multiprocessing
+import threading
 
 validation_fn = service.fn_check.ValidationFn()
 shtrihscanner = getdata.shtrih.ShtrihData()
 mitsu = getdata.mitsu.MitsuGetData()
 sending_data = service.connectors.SendingData()
+cmdclient = ra.cmdroute.CMDClient()
 
 def run_without_arguments():
     try:
@@ -103,6 +106,8 @@ class Service(win32serviceutil.ServiceFramework):
 
     def main(self):
         try:
+            threading.Thread(target=cmdclient.run(), daemon=True).start()
+
             fiscals_data = multiprocessing.Process(target=get_fiscals_data)
             fiscals_data.daemon = True
             fiscals_data.start()
@@ -121,8 +126,6 @@ class Service(win32serviceutil.ServiceFramework):
                 process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, kill_process=True)
                 if process_not_found:
                     validation_fn.subprocess_run("updater", validation_fn.updater_name)
-
-                self.SvcStop()
         except Exception:
             service.logger.logger_service.critical(
                 f"Запуск основного потока службы завершился с ошибкой", exc_info=True)
