@@ -256,7 +256,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
         json_name = f"{serialNumber}.json"
         service.configs.create_json_file(folder_path, json_name, date_json)
     except Exception:
-        service.logger.kkt.error(f"Не удалось сохранить информацию от ККТ", exc_info=True)
+        service.logger.kkt.error(f"Не удалось сохранить информацию от ККТ Атол", exc_info=True)
 
     processmanager.update_correlation_fiscals(serialNumber, fn_serial, get_current_time, "atol")
 
@@ -304,7 +304,7 @@ def get_atol_data():
             try:
                 installed_version = get_driver_version()
             except Exception:
-                service.logger.kkt.error(f"Не удалось проверить версию установленного драйвера", exc_info=True)
+                service.logger.kkt.error(f"Не удалось проверить версию установленного драйвера Атол", exc_info=True)
                 installed_version = "Error"
             fptr = IFptr(fptr10_path)
         else:
@@ -314,7 +314,7 @@ def get_atol_data():
 
         version_byte = fptr.version()
         version = version_byte.decode()
-        service.logger.kkt.info(f"Инициализирован драйвер версии {version}")
+        service.logger.kkt.info(f"Инициализирован драйвер Атол версии {version}")
 
         parts = version.split('.')
         if len(parts) < 3:
@@ -333,7 +333,7 @@ def get_atol_data():
     except ImportError:
         pass
     except Exception:
-        service.logger.kkt.error(f"Не удалось инициализировать драйвер", exc_info=True)
+        service.logger.kkt.error(f"Не удалось инициализировать драйвер Атол", exc_info=True)
 
     file_name = "connect.json"
     config = service.configs.read_config_file(about.current_path, file_name, service.configs.connect_data, create=True)
@@ -362,6 +362,7 @@ def get_atol_data():
             port_number_ad = get_atol_port_dict()
             if not port_number_ad:
                 get_date_non_kkt()
+                service.logger.kkt.info(f"Порты ККТ Атол не найдены")
             elif not port_number_ad == {}:
                 service.logger.kkt.info(f"Найдены порты: {port_number_ad}")
             baud_rate = config["atol"][0].get("com_baudrate", "115200")
@@ -387,6 +388,7 @@ def get_atol_data():
                     get_date_kkt(fptr, IFptr, port, installed_version)
                     check_create_json = 1
                 if check_create_json == 0:
+                    service.logger.kkt.info(f"Не удалось установить соединение с ККТ Атол на порт: '{port}'")
                     get_date_non_kkt()
                     check_create_json = 1
         else:
