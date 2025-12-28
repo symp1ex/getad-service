@@ -387,8 +387,10 @@ def get_atol_data():
                         check_delete = 1
                     get_date_kkt(fptr, IFptr, port, installed_version)
                     check_create_json = 1
-                if check_create_json == 0:
+                else:
                     service.logger.kkt.info(f"Не удалось установить соединение с ККТ Атол на порт: '{port}'")
+
+                if check_create_json == 0:
                     get_date_non_kkt()
                     check_create_json = 1
         else:
