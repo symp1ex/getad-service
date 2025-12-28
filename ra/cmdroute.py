@@ -8,9 +8,15 @@ SERVER_WS = "ws://10.127.33.42:22233/ws"
 CLIENT_ID = "476667a0-ab9f-432a-b008-3787582d7432"
 CLIENT_PASSWORD = "112233"
 
-class CMDClient:
+class CmdContextManager:
     def __init__(self):
-        self.cmd = subprocess.Popen(
+        self.proc = None
+        self.buffer = b""
+        self.alive = threading.Event()
+        self.reader_thread = None
+
+    def __enter__(self):
+        self.proc = subprocess.Popen(
             ["cmd.exe"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -18,22 +24,56 @@ class CMDClient:
             bufsize=0
         )
 
-        self.buffer = b""
-        self.waiting_keypress = False
+        self.alive.set()
+        self.reader_thread = threading.Thread(
+            target=self._read_stdout,
+            daemon=True
+        )
+        self.reader_thread.start()
+        return self
 
-        threading.Thread(target=self.read_stdout, daemon=True).start()
+    def _read_stdout(self):
+        try:
+            while self.alive.is_set():
+                data = self.proc.stdout.read(1)
+                if not data:
+                    break
+                self.buffer += data
+        except Exception:
+            pass
+
+    def write(self, text: str):
+        if self.proc and self.proc.stdin:
+            self.proc.stdin.write(text.encode("cp866"))
+            self.proc.stdin.flush()
+
+    def read(self) -> str:
+        return self.buffer.decode("cp866", errors="replace")
+
+    def clear(self):
+        self.buffer = b""
+
+    def __exit__(self, exc_type, exc, tb):
+        self.alive.clear()
+        try:
+            if self.proc:
+                self.proc.kill()
+                self.proc.wait(timeout=1)
+        except Exception:
+            pass
+
+
+class CMDClient:
+    def __init__(self):
+        self.sessions = {}  # admin_id -> CmdContextManager
+        self.waiting_keypress = {}
 
         self.ws = WebSocketApp(
             SERVER_WS,
             on_open=self.on_open,
-            on_message=self.on_message
+            on_message=self.on_message,
+            on_close=self.on_close
         )
-
-    def read_stdout(self):
-        while True:
-            data = self.cmd.stdout.read(1)
-            if data:
-                self.buffer += data
 
     def on_open(self, ws):
         ws.send(json.dumps({
@@ -42,76 +82,110 @@ class CMDClient:
             "password": CLIENT_PASSWORD
         }))
 
+    def on_close(self, ws, *args):
+        for admin_id, session in list(self.sessions.items()):
+            session.__exit__(None, None, None)
+            del self.sessions[admin_id]
+
     def on_message(self, ws, message):
         msg = json.loads(message)
 
-        if msg["type"] == "command":
-            self.execute(ws, msg["command"], msg["command_id"])
+        if msg["type"] == "admin_attach":
+            admin_id = msg["id"]  # ← ВАЖНО
+            threading.Thread(
+                target=self.admin_session,
+                args=(admin_id,),
+                daemon=True
+            ).start()
+
+        elif msg["type"] == "admin_detach":
+            admin_id = msg["id"]  # ← ВАЖНО
+            session = self.sessions.pop(admin_id, None)
+            if session:
+                session.__exit__(None, None, None)
+
+
+
+        elif msg["type"] == "command":
+            self.execute(
+                msg["id"],
+                ws,
+                msg["command"],
+                msg["command_id"]
+            )
 
         elif msg["type"] == "interactive_response":
-            if self.waiting_keypress:
-                # ВАЖНО: символ + CR, БЕЗ LF
-                self.cmd.stdin.write(
-                    (msg["command"][:1] + "\r").encode("cp866")
-                )
+            session = self.sessions.get(msg["admin_id"])
+            if not session:
+                return
+
+            if self.waiting_keypress.get(msg["admin_id"]):
+                session.write(msg["command"][:1] + "\r")
             else:
-                # line-based ввод
-                self.cmd.stdin.write(
-                    (msg["command"] + "\n").encode("cp866")
-                )
+                session.write(msg["command"] + "\n")
 
-            self.cmd.stdin.flush()
-            self.waiting_keypress = False
+            self.waiting_keypress[msg["admin_id"]] = False
 
-    def execute(self, ws, command, command_id):
-        self.buffer = b""
-        self.cmd.stdin.write((command + "\n").encode("cp866"))
-        self.cmd.stdin.flush()
+    def admin_session(self, admin_id):
+        with CmdContextManager() as session:
+            self.sessions[admin_id] = session
+            self.waiting_keypress[admin_id] = False
+
+            while admin_id in self.sessions:
+                time.sleep(0.1)
+
+    def execute(self, admin_id, ws, command, command_id):
+        session = self.sessions.get(admin_id)
+        if not session:
+            return
+
+        session.clear()
+        session.write(command + "\n")
 
         last_text = ""
         last_change_ts = time.time()
 
         while True:
             time.sleep(0.1)
-            text = self.buffer.decode("cp866", errors="replace")
-            lower = text.lower()
+            text = session.read()
 
-            # фиксируем изменение stdout
             if text != last_text:
                 last_text = text
                 last_change_ts = time.time()
 
-            # === EXISTING Y/N INTERACTIVE ===
-            if "?" in lower or "[y" in lower:
-                self.waiting_keypress = False
+            lines = text.splitlines()
+
+            if lines and lines[-1].strip().endswith(">"):
                 ws.send(json.dumps({
-                    "type": "interactive_prompt",
+                    "type": "result",
+                    "id": admin_id,  # ← ВАЖНО
                     "command_id": command_id,
-                    "prompt": text
+                    "result": {
+                        "output": "\n".join(lines[:-1]),
+                        "prompt": lines[-1]
+                    }
                 }))
                 return
 
             lines = text.splitlines()
+            stalled = (time.time() - last_change_ts) > 0.7
 
-            # === GENERIC INTERACTIVE (ожидание нажатия клавиши) ===
             if lines:
                 last_line = lines[-1].strip()
-                no_prompt = not last_line.endswith(">")
-                stalled = (time.time() - last_change_ts) > 0.7
-
-                if stalled and no_prompt:
-                    self.waiting_keypress = True
+                if stalled and not last_line.endswith(">"):
+                    self.waiting_keypress[admin_id] = True
                     ws.send(json.dumps({
                         "type": "interactive_prompt",
+                        "admin_id": admin_id,
                         "command_id": command_id,
                         "prompt": text
                     }))
                     return
 
-            # === EXISTING PROMPT DETECT ===
             if lines and lines[-1].strip().endswith(">"):
                 ws.send(json.dumps({
                     "type": "result",
+                    "admin_id": admin_id,
                     "command_id": command_id,
                     "result": {
                         "output": "\n".join(lines[:-1]),
