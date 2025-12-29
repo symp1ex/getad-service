@@ -427,19 +427,26 @@ class ResourceManagement:
 </details>
 <br>
 
-В **`tools\crypto-key`** лежит скрипт, в который нужно вставить свои учётные данные и выполнить его. На выходе получите текстовый документ с зашифрованными данными, которые нужно будет вставить в конфиг
+В каталоге `_tools` лежит скрипт `ga-tools.py` и конфиг `ga-tools.json`, в конфиг нужно вставить свои учётные данные, ключ и выполнить скрипт. На выходе получите текстовый документ с зашифрованными данными, которые нужно будет вставить в конфиг `service.json`
+<br>
+
+Дополнительные `decrypt_data` поля нужны на случай, если необходимо что-то расшифровать тем же ключом.
 
 <details>
-<summary><b>crypto-key.py</b></summary>
+<summary><b>ga-tools.json</b></summary>
   
-```python
-# Пример использования:
-key = b't_qxC_HN04Tiy1ish2P27ROYSJt_m7_FE2JT6gYngOM='  # Ваш ключ
-
-data_to_encrypt = "telegram_token_bot"
-data_to_encrypt2 = "telegram_chat_id"
-data_to_encrypt3 = "url"
-data_to_encrypt4 = "api_key"
+```json
+{
+	"crypto_key": "t_qxC_HN04Tiy1ish2P27ROYSJt_m7_FE2JT6gYngOM=",
+	"url": "",
+	"api_key": "",
+	"bot_token": "",
+	"chat_id": "",
+	"decrypt_data_1": "",
+	"decrypt_data_2": "",
+	"decrypt_data_3": "",
+	"decrypt_data_4": ""
+}
 ```
 </details>
 <br>
