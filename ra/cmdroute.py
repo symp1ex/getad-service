@@ -127,12 +127,31 @@ class CMDClient:
             self.waiting_keypress[msg["admin_id"]] = False
 
     def admin_session(self, admin_id):
-        with CmdContextManager() as session:
-            self.sessions[admin_id] = session
-            self.waiting_keypress[admin_id] = False
+        try:
+            with CmdContextManager() as session:
+                self.sessions[admin_id] = session
+                self.waiting_keypress[admin_id] = False
 
-            while admin_id in self.sessions:
-                time.sleep(0.1)
+                while admin_id in self.sessions:
+                    # === КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ===
+                    if session.proc.poll() is not None:
+                        # cmd.exe завершился (exit / crash)
+                        break
+
+                    time.sleep(0.1)
+
+        finally:
+            # === УВЕДОМЛЕНИЕ СЕРВЕРА ===
+            try:
+                self.ws.send(json.dumps({
+                    "type": "session_closed",
+                    "id": admin_id
+                }))
+            except Exception:
+                pass
+
+            self.sessions.pop(admin_id, None)
+            self.waiting_keypress.pop(admin_id, None)
 
     def execute(self, admin_id, ws, command, command_id):
         session = self.sessions.get(admin_id)
