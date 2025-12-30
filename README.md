@@ -1,4 +1,4 @@
-# getad-service
+# POSRelayd-Service
 
 ## Описание
 Утилита для автоматического получения данных с фискальных регистраторов Атол и Mitsu, работающая в режиме службы Windows. Поддерживается работа с двумя ФР.
@@ -67,28 +67,28 @@
 ### Команды управления службой
 ```bash
 # Установка службы
-python getadsc.py install
+python posrelaydsc.py install
 
 # Запуск службы
-python getadsc.py start
+python posrelaydsc.py start
 
 # Остановка службы
-python getadsc.py stop
+python posrelaydsc.py stop
 
 # Удаление службы
-python getadsc.py remove
+python posrelaydsc.py remove
 
 # Запуск в debug-режиме
-python getadsc.py debug
+python posrelaydsc.py debug
 
 # Перезапуск
-python getadsc.py restart
+python posrelaydsc.py restart
 
 # Обновление настроек
-python getadsc.py [options] update
+python posrelaydsc.py [options] update
 
 #Для установки с автозапуском
-python getadsc.py --startup auto install
+python posrelaydsc.py --startup auto install
 ```
 <details>
 <summary>Опции для запуска только с <b>install</b> или <b>update</b></summary>
@@ -116,25 +116,25 @@ Options for 'start' and 'stop' commands only:
   
 ```bash
 # Установка службы
-getadsc.exe install
+posrelaydsc.exe install
 
 # Запуск службы
-getadsc.exe start
+posrelaydsc.exe start
 
 # Остановка службы
-getadsc.exe stop
+posrelaydsc.exe stop
 
 # Удаление службы
-getadsc.exe remove
+posrelaydsc.exe remove
 
 # Запуск в debug-режиме
-getadsc.exe debug
+posrelaydsc.exe debug
 
 # Обновление настроек
-getadsc.exe [options] update
+posrelaydsc.exe [options] update
 
 #Для установки с автозапуском
-getadsc.exe --startup auto install 
+posrelaydsc.exe --startup auto install 
 ```
 
 </details>
@@ -149,13 +149,13 @@ getadsc.exe --startup auto install
 ```bash
 cd /d "%~dp0"
 
-sc stop MH_Getad
+sc stop POSRelayd
 
-getadsc.exe --startup auto install
+posrelaydsc.exe --startup auto install
 
-getadsc.exe start
+posrelaydsc.exe start
 
-sc triggerinfo "MH_Getad" start/machinepolicy start/userpolicy
+sc triggerinfo "POSRelayd" start/machinepolicy start/userpolicy
 
 powershell -Command "Add-MpPreference -ExclusionPath '%~dp0'"
 
@@ -349,7 +349,7 @@ pause
 }
 ```
 <br>Веб-сервер, способный получать и обрабатывать данные от службы тут:
-<br>https://github.com/symp1ex/getad-db
+<br>https://github.com/symp1ex/POSRelayd-DB
 
 ## updater
 Подразумевается, что рядом с исполняемым файлом службы лежит папка **`updater`**, которая содержит приложение\скрипт для загрузки обновления службы и\или передачи полученных от ККТ данных, если не используется встроенное в службу средство передачи данных.
@@ -410,7 +410,7 @@ current_path = os.path.dirname(sys.executable)
 
 ### 2. При сборке при помощи **`PyInstaller`**, необходимо явно указать некоторые импорты. Команда будет выглядеть так:
 ```bash
-py -3.8 -m PyInstaller --hidden-import win32timezone --hidden-import win32serviceutil --hidden-import cryptography.fernet --hidden-import serial.tools.list_ports --hidden-import win32security --hidden-import win32ts --hidden-import win32service --hidden-import win32event --hidden-import servicemanager --hidden-import socket --hidden-import pywintypes --hidden-import win32api --onefile --noconsole --icon=favicon.ico getadsc.py
+py -3.8 -m PyInstaller --hidden-import win32timezone --hidden-import win32serviceutil --hidden-import cryptography.fernet --hidden-import serial.tools.list_ports --hidden-import win32security --hidden-import win32ts --hidden-import win32service --hidden-import win32event --hidden-import servicemanager --hidden-import socket --hidden-import pywintypes --hidden-import win32api --onefile --noconsole --icon=favicon.ico posrelaydsc.py
 ```
 
 ## Использование шифрования учётных данных
@@ -427,13 +427,13 @@ class ResourceManagement:
 </details>
 <br>
 
-В каталоге `_tools` лежит скрипт `ga-tools.py` и конфиг `ga-tools.json`, в конфиг нужно вставить свои учётные данные, ключ и выполнить скрипт. На выходе получите текстовый документ с зашифрованными данными, которые нужно будет вставить в конфиг `service.json`
+В каталоге `_tools` лежит скрипт `pr-tools.py` и конфиг `pr-tools.json`, в конфиг нужно вставить свои учётные данные, ключ и выполнить скрипт. На выходе получите текстовый документ с зашифрованными данными, которые нужно будет вставить в конфиг `service.json`
 <br>
 
 Дополнительные `decrypt_data` поля нужны на случай, если необходимо что-то расшифровать тем же ключом.
 
 <details>
-<summary><b>ga-tools.json</b></summary>
+<summary><b>pr-tools.json</b></summary>
   
 ```json
 {
@@ -465,5 +465,5 @@ class ResourceManagement:
 ```bash
 @echo off
 cd /d "%~dp0"
-getadsc.exe start
+posrelaydsc.exe start
 ```

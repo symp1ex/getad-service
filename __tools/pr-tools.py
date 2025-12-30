@@ -36,7 +36,7 @@ def decrypt_data(crypto_key_bytes, encrypted_data):
     return decrypted_data
 
 def main():
-    json_file = "ga-tools.json"
+    json_file = "pr-tools.json"
     config = read_config_file(json_file)
 
     crypto_key = config.get("crypto_key")
