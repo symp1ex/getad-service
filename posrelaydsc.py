@@ -66,8 +66,8 @@ def get_fiscals_data():
     mitsu.get_data()
 
 class Service(win32serviceutil.ServiceFramework):
-    _svc_name_ = "MH_Getad"  # Название службы
-    _svc_display_name_ = "MH_Getad"  # Отображаемое имя службы
+    _svc_name_ = "POSRelayd"  # Название службы
+    _svc_display_name_ = "POSRelayd"  # Отображаемое имя службы
     _svc_description_ = "Check Fiscal Service"  # Описание службы
     _svc_start_type_ = win32service.SERVICE_AUTO_START  # Автозапуск
 
