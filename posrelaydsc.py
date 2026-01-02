@@ -141,7 +141,7 @@ if __name__ == '__main__':
             idx = sys.argv.index("-pass")
             password = sys.argv[idx + 1]
         except (IndexError, ValueError):
-            service.logger.logger_service.warning("Usage: posrelayd.exe -pass <password>")
+            service.logger.logger_service.warning("Usage: posrelaydsc.exe -pass <password>")
             sys.exit(1)
 
         from ra.cmdroute import send_password_once
