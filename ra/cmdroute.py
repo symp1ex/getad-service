@@ -1,3 +1,5 @@
+import about
+import os
 import subprocess
 import threading
 import json
@@ -6,7 +8,39 @@ from websocket import WebSocketApp
 
 SERVER_WS = "ws://10.127.33.42:22233/ws"
 CLIENT_ID = "476667a0-ab9f-432a-b008-3787582d7432"
-CLIENT_PASSWORD = "112233"
+API_KEY = "123"
+
+config_path = os.path.join(about.current_path, "_resources/remote-access.json")
+
+def send_password_once(password: str):
+    done = False
+
+    def on_open(ws):
+        ws.send(json.dumps({
+            "type": "client_hello",
+            "id": CLIENT_ID,
+            "api_key": API_KEY,
+            "password": password
+        }))
+
+    def on_message(ws, message):
+        nonlocal done
+        msg = json.loads(message)
+
+        # сервер может прислать temp_pass — игнорируем
+        done = True
+        ws.close()
+
+    ws = WebSocketApp(
+        SERVER_WS,
+        on_open=on_open,
+        on_message=on_message
+    )
+
+    ws.run_forever()
+
+    # страховка от зависания
+    time.sleep(0.2)
 
 class CmdContextManager:
     def __init__(self):
@@ -75,11 +109,22 @@ class CMDClient:
             on_close=self.on_close
         )
 
+    def save_temp_pass(self, temp_pass: str):
+        data = {
+            "temp_pass": temp_pass
+        }
+
+        try:
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            print("Failed to save temp_pass:", e)
+
     def on_open(self, ws):
         ws.send(json.dumps({
             "type": "client_hello",
             "id": CLIENT_ID,
-            "password": CLIENT_PASSWORD
+            "api_key": API_KEY
         }))
 
     def on_close(self, ws, *args):
@@ -90,8 +135,13 @@ class CMDClient:
     def on_message(self, ws, message):
         msg = json.loads(message)
 
+        if msg["type"] == "temp_pass":
+            self.save_temp_pass(msg["temp_pass"])
+            print("Received temp_pass from server")
+            return
+
         if msg["type"] == "admin_attach":
-            admin_id = msg["id"]  # ← ВАЖНО
+            admin_id = msg["id"]
             threading.Thread(
                 target=self.admin_session,
                 args=(admin_id,),
@@ -99,12 +149,10 @@ class CMDClient:
             ).start()
 
         elif msg["type"] == "admin_detach":
-            admin_id = msg["id"]  # ← ВАЖНО
+            admin_id = msg["id"]
             session = self.sessions.pop(admin_id, None)
             if session:
                 session.__exit__(None, None, None)
-
-
 
         elif msg["type"] == "command":
             self.execute(
@@ -214,4 +262,19 @@ class CMDClient:
                 return
 
     def run(self):
-        self.ws.run_forever()
+        while True:
+            try:
+                self.ws = WebSocketApp(
+                    SERVER_WS,
+                    on_open=self.on_open,
+                    on_message=self.on_message,
+                    on_close=self.on_close,
+                )
+
+                self.ws.run_forever()
+            except Exception as e:
+                print("WebSocket error:", e)
+
+            print("Соединение потеряно. Повтор через 10 секунд...")
+            time.sleep(10)
+

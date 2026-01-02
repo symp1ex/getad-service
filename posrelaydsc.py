@@ -135,6 +135,19 @@ class Service(win32serviceutil.ServiceFramework):
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()
+
+    if "-pass" in sys.argv:
+        try:
+            idx = sys.argv.index("-pass")
+            password = sys.argv[idx + 1]
+        except (IndexError, ValueError):
+            service.logger.logger_service.warning("Usage: posrelayd.exe -pass <password>")
+            sys.exit(1)
+
+        from ra.cmdroute import send_password_once
+        send_password_once(password)
+        sys.exit(0)
+
     if len(sys.argv) == 1:
         try:
             servicemanager.Initialize()
