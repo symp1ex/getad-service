@@ -94,6 +94,17 @@ service_data = {
     }
 }
 
+ra_config = {
+    "enabled": False,
+    "connection_data": {
+        "encryption": False,
+        "url": "",
+        "api_key": ""
+    },
+    "id": "",
+    "temp_pass": ""
+}
+
 def write_json_file(config, file_name):
     file_path = os.path.join(about.current_path, file_name)
     try:

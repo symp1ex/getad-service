@@ -54,7 +54,15 @@ class ResourceManagement:
             decrypted_data = cipher.decrypt(encrypted_data).decode()
             return decrypted_data
         except Exception:
-            service.logger.logger_service.error("Не удалось дешифровать данные для аутентификации", exc_info=True)
+            service.logger.logger_service.error("Не удалось дешифровать данные", exc_info=True)
+
+    def encrypt_data(self, data):
+        try:
+            cipher = Fernet(self.crypto_key)
+            encrypted_data = cipher.encrypt(data.encode())
+            return encrypted_data
+        except Exception:
+            service.logger.logger_service.error("Не удалось зашифровать данные", exc_info=True)
 
     def update_correlation_fiscals(self, serialNumber, fn_serial, get_current_time, model_kkt):
         self.get_fiscals_json()
@@ -136,8 +144,9 @@ class ResourceManagement:
     def get_uuid(self):
         try:
             if os.path.exists(self.uuid_file):
-                with open(self.uuid_file, 'r') as f:
-                    stored_uuid = f.read().strip()
+                with open(self.uuid_file, 'rb') as f:
+                    encrypted_uuid = f.read()
+                    stored_uuid = self.decrypt_data(encrypted_uuid)
                     # Проверяем, соответствует ли прочитанное значение формату UUID
                     try:
                         uuid.UUID(stored_uuid)
@@ -179,9 +188,11 @@ class ResourceManagement:
             stable_uuid = uuid.UUID(bytes=hash_bytes[:16])
             service.logger.logger_service.debug(f"Сформирован uuid: '{stable_uuid}'")
 
+            encrypted_uuid = self.encrypt_data(str(stable_uuid))
+
             try:
                 with open(self.uuid_file, 'w') as f:
-                    f.write(str(stable_uuid))
+                    f.write(str(encrypted_uuid.decode('utf-8')))
                 service.logger.logger_service.debug(
                     f"UUID '{stable_uuid}' записан в файл: '{os.path.abspath(self.uuid_file)}'")
             except Exception:

@@ -1,4 +1,7 @@
 import about
+import service.logger
+import service.sys_manager
+import service.configs
 import os
 import subprocess
 import threading
@@ -6,41 +9,6 @@ import json
 import time
 from websocket import WebSocketApp
 
-SERVER_WS = "ws://10.127.33.42:22233/ws"
-CLIENT_ID = "476667a0-ab9f-432a-b008-3787582d7432"
-API_KEY = "123"
-
-config_path = os.path.join(about.current_path, "_resources/remote-access.json")
-
-def send_password_once(password: str):
-    done = False
-
-    def on_open(ws):
-        ws.send(json.dumps({
-            "type": "client_hello",
-            "id": CLIENT_ID,
-            "api_key": API_KEY,
-            "password": password
-        }))
-
-    def on_message(ws, message):
-        nonlocal done
-        msg = json.loads(message)
-
-        # сервер может прислать temp_pass — игнорируем
-        done = True
-        ws.close()
-
-    ws = WebSocketApp(
-        SERVER_WS,
-        on_open=on_open,
-        on_message=on_message
-    )
-
-    ws.run_forever()
-
-    # страховка от зависания
-    time.sleep(0.2)
 
 class CmdContextManager:
     def __init__(self):
@@ -97,34 +65,59 @@ class CmdContextManager:
             pass
 
 
-class CMDClient:
+class CMDClient(service.sys_manager.ResourceManagement):
+    config_ra_name = "remote-access.json"
+
     def __init__(self):
+        super().__init__()
+
+        self.config_ra_path = os.path.join(about.current_path, self.resource_path, self.config_ra_name)
+        self.config_ra = service.configs.read_config_file(
+            about.current_path, self.config_ra_path, service.configs.ra_config, create=True)
+
+        try: self.ra_enabled = int(self.config_ra.get("enabled", False))
+        except: self.ra_enabled = 0
+
+        self.encryption_enabled = self.config_ra.get("connection_data", {}).get("encryption", False)
+        self.server_ws = str(self.config_ra.get("connection_data", {}).get("url", ""))
+        self.api_key = str(self.config_ra.get("connection_data", {}).get("api_key", ""))
+        self.client_id = str(self.get_uuid())
+
+        if self.ra_enabled == False:
+            service.logger.ra.info("Функция удалённого доступа отключена")
+        else:
+            self.get_connection_data()
+
         self.sessions = {}  # admin_id -> CmdContextManager
         self.waiting_keypress = {}
 
         self.ws = WebSocketApp(
-            SERVER_WS,
+            self.server_ws,
             on_open=self.on_open,
             on_message=self.on_message,
             on_close=self.on_close
         )
 
-    def save_temp_pass(self, temp_pass: str):
-        data = {
-            "temp_pass": temp_pass
-        }
-
+    def get_connection_data(self):
         try:
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
-        except Exception as e:
-            print("Failed to save temp_pass:", e)
+            if self.encryption_enabled == True:
+                self.server_ws = self.decrypt_data(self.server_ws)
+                self.api_key = self.decrypt_data(self.api_key)
+                service.logger.ra.info("Данные для подключения к NoIP-серверу успешно расшифрованы")
+                return
+            service.logger.ra.warning("Шифрование данных для подключения к NoIP-серверу отключено")
+        except Exception:
+            service.logger.ra.error("Не удалось расшифровать данные для подключения к NoIP-серверу", exc_info=True)
+
+    def save_temp_pass(self, temp_pass: str):
+        self.config_ra["temp_pass"] = temp_pass
+        service.configs.write_json_file(self.config_ra, self.config_ra_path)
 
     def on_open(self, ws):
         ws.send(json.dumps({
             "type": "client_hello",
-            "id": CLIENT_ID,
-            "api_key": API_KEY
+            "id": self.client_id,
+            "api_key": self.api_key
         }))
 
     def on_close(self, ws, *args):
@@ -265,7 +258,7 @@ class CMDClient:
         while True:
             try:
                 self.ws = WebSocketApp(
-                    SERVER_WS,
+                    self.server_ws,
                     on_open=self.on_open,
                     on_message=self.on_message,
                     on_close=self.on_close,

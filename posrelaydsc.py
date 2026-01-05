@@ -23,7 +23,6 @@ validation_fn = service.fn_check.ValidationFn()
 shtrihscanner = getdata.shtrih.ShtrihData()
 mitsu = getdata.mitsu.MitsuGetData()
 sending_data = service.connectors.SendingData()
-cmdclient = ra.cmdroute.CMDClient()
 
 def run_without_arguments():
     try:
@@ -105,8 +104,11 @@ class Service(win32serviceutil.ServiceFramework):
         self.main()
 
     def main(self):
+        cmdclient = ra.cmdroute.CMDClient()
+
         try:
-            threading.Thread(target=cmdclient.run, daemon=True).start()
+            if cmdclient.ra_enabled == True:
+                threading.Thread(target=cmdclient.run, daemon=True).start()
 
             fiscals_data = multiprocessing.Process(target=get_fiscals_data)
             fiscals_data.daemon = True
@@ -144,7 +146,7 @@ if __name__ == '__main__':
             service.logger.logger_service.warning("Usage: posrelaydsc.exe -pass <password>")
             sys.exit(1)
 
-        from ra.cmdroute import send_password_once
+        from ra.setpass import send_password_once
         send_password_once(password)
         sys.exit(0)
 
