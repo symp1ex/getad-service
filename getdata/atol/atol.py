@@ -1,13 +1,14 @@
 import service.logger 
 import service.configs
 import service.sys_manager
+import getdata.get_remote
 from getdata.atol.comautodetect import get_atol_port_dict
-from getdata.get_remote import get_server_url, get_teamviewer_id, get_anydesk_id, get_hostname, get_litemanager_id
 import about
 import json
 import os
 
 processmanager = service.sys_manager.ProcessManagement()
+get_remote_id = getdata.get_remote.AnyRemoteId()
 
 def get_driver_version():
     file_path = "C:\\Program Files (x86)\\ATOL\\Drivers10\\KKT\\bin\\fptr10.dll"
@@ -114,8 +115,8 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
         address = fptr.getParamString(1009)
     except Exception:
         service.logger.kkt.error(f"Не удалось сделать запрос к ФР", exc_info=True)
-        attribute_marked = "Не поддерживается в текущей версии драйвера"
-        address = "Не поддерживается в текущей версии драйвера"
+        attribute_marked = "Error"
+        address = "Error"
 
     # запрос общей инфы из ФН
     try:
@@ -128,7 +129,7 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
     except Exception:
         # Обработка случая, когда атрибут LIBFPTR_PARAM_FN_EXECUTION отсутствует
         service.logger.kkt.error(f"Не удалось сделать запрос к ФР", exc_info=True)
-        fnExecution = "Не поддерживается в текущей версии драйвера"
+        fnExecution = "Error"
 
     # функция запроса даты регистрации, если регистрация была первой
     def datetime_reg_check(fptr):
@@ -158,20 +159,12 @@ def get_date_kkt(fptr, IFptr, port, installed_version):
 
         dateTime_end = fptr.getParamDateTime(IFptr.LIBFPTR_PARAM_DATE_TIME)
 
-        # # версия загрузчика
-        # fptr.setParam(IFptr.LIBFPTR_PARAM_DATA_TYPE, IFptr.LIBFPTR_DT_UNIT_VERSION)
-        # fptr.setParam(IFptr.LIBFPTR_PARAM_UNIT_TYPE, IFptr.LIBFPTR_UT_BOOT)
-        # fptr.queryData()
-        # bootVersion = fptr.getParamString(IFptr.LIBFPTR_PARAM_UNIT_VERSION)
-
-
         # запрос версии конфигурации
         fptr.setParam(IFptr.LIBFPTR_PARAM_DATA_TYPE, IFptr.LIBFPTR_DT_UNIT_VERSION)
         fptr.setParam(IFptr.LIBFPTR_PARAM_UNIT_TYPE, IFptr.LIBFPTR_UT_CONFIGURATION)
         fptr.queryData()
 
         bootVersion = fptr.getParamString(IFptr.LIBFPTR_PARAM_UNIT_VERSION)
-        #releaseVersion = fptr.getParamString(IFptr.LIBFPTR_PARAM_UNIT_RELEASE_VERSION)
 
 
         # запрос версии ФФД
@@ -281,14 +274,12 @@ def get_date_non_kkt():
 
 def get_remote():
     try:
-        hostname = get_hostname()
-        url_rms = get_server_url()
-        teamviever_id = get_teamviewer_id()
-        anydesk_id = get_anydesk_id()
-        litemanager_id = get_litemanager_id()
+        hostname = processmanager.get_hostname()
+        url_rms = get_remote_id.get_server_url()
+        teamviever_id = get_remote_id.get_teamviewer_id()
+        anydesk_id = get_remote_id.get_anydesk_id()
+        litemanager_id = get_remote_id.get_litemanager_id()
 
-        #drive = 'C:\\'
-        #total_space_gb, free_space_gb = get_disk_info(drive)
         return hostname, url_rms, teamviever_id, anydesk_id, litemanager_id
     except Exception:
         service.logger.kkt.error(f"Не удалось получить данные с хоста", exc_info=True)

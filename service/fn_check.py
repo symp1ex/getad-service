@@ -5,7 +5,6 @@ import getdata.get_remote
 import getdata.mitsu
 import service.sys_manager
 from getdata.atol.atol import get_driver_version
-from getdata.get_remote import get_server_url
 import about
 import re
 import os
@@ -15,6 +14,7 @@ from datetime import datetime, timedelta
 mitsu = getdata.mitsu.MitsuGetData()
 tg_notification = service.connectors.TelegramNotification()
 sending_data = service.connectors.SendingData()
+get_remote_id = getdata.get_remote.AnyRemoteId()
 
 
 class ValidationFn(service.sys_manager.ProcessManagement):
@@ -75,7 +75,7 @@ class ValidationFn(service.sys_manager.ProcessManagement):
                 elif model_kkt == "mitsu":
                     json_file["installed_driver"] = str(mitsu.get_driver_version())
 
-                json_file["url_rms"] = get_server_url()
+                json_file["url_rms"] = get_remote_id.get_server_url()
                 json_file["vc"] = about.version
                 json_file["uuid"] = self.get_uuid()
                 service.configs.write_json_file(json_file, json_path)
@@ -162,8 +162,11 @@ class ValidationFn(service.sys_manager.ProcessManagement):
 
         if self.logs_dir == "iiko":
             target_folder_path = "iiko\\cashserver"
-            self.logs_dir = os.path.join(getdata.get_remote.get_user_appdata(target_folder_path),
-                                         'iiko', 'Cashserver', 'logs')
+
+            if get_remote_id.user_appdata == None:
+                get_remote_id.get_user_appdata(target_folder_path)
+
+            self.logs_dir = os.path.join(str(get_remote_id.user_appdata), 'iiko', 'Cashserver', 'logs')
 
         if not os.path.exists(self.logs_dir):
             service.logger.logger_service.warning(

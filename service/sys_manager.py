@@ -22,6 +22,7 @@ class ResourceManagement:
     date_path = os.path.join(about.current_path, "date")
     fiscals_file = os.path.join(about.current_path, resource_path, "fiscals.json")
     uuid_file = os.path.join(about.current_path, resource_path, "uuid")
+    uuid = None
 
     def __init__(self):
         self.config = service.configs.read_config_file(about.current_path, self.config_file,
@@ -142,6 +143,9 @@ class ResourceManagement:
                                                 exc_info=True)
 
     def get_uuid(self):
+        if ResourceManagement.uuid != None:
+            return ResourceManagement.uuid
+
         try:
             if os.path.exists(self.uuid_file):
                 with open(self.uuid_file, 'rb') as f:
@@ -152,7 +156,8 @@ class ResourceManagement:
                         uuid.UUID(stored_uuid)
                         service.logger.logger_service.debug(
                             f"UUID прочитан из файла '{os.path.abspath(self.uuid_file)}': '{stored_uuid}'")
-                        return stored_uuid
+                        ResourceManagement.uuid = stored_uuid
+                        return ResourceManagement.uuid
                     except ValueError:
                         service.logger.logger_service.warning(
                             f"Содержимое файла '{os.path.abspath(self.uuid_file)}' не соответствует формату UUID")
@@ -198,7 +203,8 @@ class ResourceManagement:
             except Exception:
                 service.logger.logger_service.error(
                     f"Не удалось записать UUID в файл '{os.path.abspath(self.uuid_file)}'", exc_info=True)
-            return str(stable_uuid)
+            ResourceManagement.uuid = str(stable_uuid)
+            return ResourceManagement.uuid
         except Exception:
             service.logger.logger_service.error(f"Не удалось сгенерировать uuid", exc_info=True)
             return "Error"
@@ -239,6 +245,15 @@ class ResourceManagement:
             service.logger.logger_service.error(
                 "Не удалось получить MAC-адрес с помощью uuid.getnode()", exc_info=True)
             return "00:00:00:00:00:00"
+
+    def get_hostname(self):
+        try:
+            hostname = socket.gethostname()
+            return hostname
+        except Exception:
+            hostname = "hostname"
+            service.logger.logger_service.error(f"Не удалось получить имя хоста", exc_info=True)
+            return hostname
 
     def get_file_version(self, file_path):
         try:

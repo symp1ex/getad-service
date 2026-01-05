@@ -153,11 +153,13 @@ class TelegramNotification(service.sys_manager.ResourceManagement):
     def send_tg_message(self, message):
         import getdata.get_remote
 
+        get_remote_id = getdata.get_remote.AnyRemoteId()
+
         try:
-            url_rms = getdata.get_remote.get_server_url()
-            teamviever_id = getdata.get_remote.get_teamviewer_id()
-            anydesk_id = getdata.get_remote.get_anydesk_id()
-            litemanager_id = getdata.get_remote.get_litemanager_id()
+            url_rms = get_remote_id.get_server_url()
+            teamviever_id = get_remote_id.get_teamviewer_id()
+            anydesk_id = get_remote_id.get_anydesk_id()
+            litemanager_id = get_remote_id.get_litemanager_id()
 
             full_message = (f"{message}\n\n"
                        f"RMS: {url_rms}\n"

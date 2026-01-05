@@ -1,4 +1,3 @@
-import time
 import serial
 import struct
 import socket
@@ -11,6 +10,7 @@ import service.sys_manager
 import getdata.get_remote
 import about
 
+get_remote_id = getdata.get_remote.AnyRemoteId()
 
 class MitsuConnect(service.sys_manager.ProcessManagement):
     get_model = "<GET DEV='?' />"
@@ -432,11 +432,11 @@ class MitsuGetData(MitsuConnect):
             attribute_marked = bool((attributes >> 4) & 1)
 
             fnExecution = self.get_value_by_tag(fn_data, "EDITION=")
-            hostname = getdata.get_remote.get_hostname()
-            url_rms = getdata.get_remote.get_server_url()
-            teamviever_id = getdata.get_remote.get_teamviewer_id()
-            anydesk_id = getdata.get_remote.get_anydesk_id()
-            litemanager_id = getdata.get_remote.get_litemanager_id()
+            hostname = self.get_hostname()
+            url_rms = get_remote_id.get_server_url()
+            teamviever_id = get_remote_id.get_teamviewer_id()
+            anydesk_id = get_remote_id.get_anydesk_id()
+            litemanager_id = get_remote_id.get_litemanager_id()
             get_current_time = self.current_time()
 
             date_json = {
