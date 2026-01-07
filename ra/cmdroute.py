@@ -156,16 +156,17 @@ class CMDClient(service.sys_manager.ResourceManagement):
             )
 
         elif msg["type"] == "interactive_response":
-            session = self.sessions.get(msg["admin_id"])
+            admin_id = msg["id"]
+            session = self.sessions.get(admin_id)
+
             if not session:
                 return
 
-            if self.waiting_keypress.get(msg["admin_id"]):
-                session.write(msg["command"][:1] + "\r")
+            if self.waiting_keypress.get(admin_id):
+                session.write(msg["command"][:1])
             else:
-                session.write(msg["command"] + "\n")
-
-            self.waiting_keypress[msg["admin_id"]] = False
+                session.write(msg["command"] + "\r\n")
+            self.waiting_keypress[admin_id] = False
 
     def admin_session(self, admin_id):
         try:
@@ -174,7 +175,6 @@ class CMDClient(service.sys_manager.ResourceManagement):
                 self.waiting_keypress[admin_id] = False
 
                 while admin_id in self.sessions:
-                    # === КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ===
                     if session.proc.poll() is not None:
                         # cmd.exe завершился (exit / crash)
                         break
@@ -182,7 +182,6 @@ class CMDClient(service.sys_manager.ResourceManagement):
                     time.sleep(0.1)
 
         finally:
-            # === УВЕДОМЛЕНИЕ СЕРВЕРА ===
             try:
                 self.ws.send(json.dumps({
                     "type": "session_closed",
@@ -200,57 +199,46 @@ class CMDClient(service.sys_manager.ResourceManagement):
             return
 
         session.clear()
-        session.write(command + "\n")
+        session.write(command + "\r\n")
 
-        last_text = ""
+        last_len = 0
         last_change_ts = time.time()
+        interactive_sent = False
 
         while True:
-            time.sleep(0.1)
-            text = session.read()
+            time.sleep(0.05)
+            raw = session.buffer
+            text = raw.decode("cp866", errors="replace")
 
-            if text != last_text:
-                last_text = text
+            if len(raw) != last_len:
+                last_len = len(raw)
                 last_change_ts = time.time()
 
-            lines = text.splitlines()
+            stalled = (time.time() - last_change_ts) > 0.6
 
-            if lines and lines[-1].strip().endswith(">"):
+            if text.rstrip().endswith(">"):
                 ws.send(json.dumps({
                     "type": "result",
-                    "id": admin_id,  # ← ВАЖНО
+                    "id": admin_id,
                     "command_id": command_id,
                     "result": {
-                        "output": "\n".join(lines[:-1]),
-                        "prompt": lines[-1]
+                        "output": text,
+                        "prompt": ""
                     }
                 }))
                 return
 
-            lines = text.splitlines()
-            stalled = (time.time() - last_change_ts) > 0.7
+            if stalled and not interactive_sent:
+                interactive_sent = True
+                self.waiting_keypress[admin_id] = True
 
-            if lines:
-                last_line = lines[-1].strip()
-                if stalled and not last_line.endswith(">"):
-                    self.waiting_keypress[admin_id] = True
-                    ws.send(json.dumps({
-                        "type": "interactive_prompt",
-                        "admin_id": admin_id,
-                        "command_id": command_id,
-                        "prompt": text
-                    }))
-                    return
+                tail = text[-300:]
 
-            if lines and lines[-1].strip().endswith(">"):
                 ws.send(json.dumps({
-                    "type": "result",
-                    "admin_id": admin_id,
+                    "type": "interactive_prompt",
+                    "id": admin_id,
                     "command_id": command_id,
-                    "result": {
-                        "output": "\n".join(lines[:-1]),
-                        "prompt": lines[-1]
-                    }
+                    "prompt": tail
                 }))
                 return
 
