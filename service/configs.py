@@ -41,8 +41,15 @@ connect_data = {
 
 service_data = {
     "service": {
-        "updater_name": "updater.exe",
-        "reboot_file": "reboot.bat",
+        "noip_connection": {
+            "encryption": False,
+            "url": "ws://10.127.33.42:22233/ws",
+            "api_key": ""
+        },
+        "updater": {
+            "enabled": True,
+            "file_name": "updater.exe"
+        },
         "log_level": "info",
         "log_days": 7
     },
@@ -61,6 +68,7 @@ service_data = {
     "validation_fn": {
         "enabled": True,
         "forced": False,
+        "reboot_file": "reboot.bat",
         "interval": 8,
         "trigger_days": 2,
         "target_time": "05:30",
@@ -79,7 +87,7 @@ service_data = {
         }
     },
     "shtrihscanner": {
-        "enabled": True,
+        "enabled": False,
         "exe_name": "shtrihscanner.exe"
     },
     "notification": {
@@ -96,13 +104,8 @@ service_data = {
 
 ra_config = {
     "enabled": False,
-    "connection_data": {
-        "encryption": False,
-        "url": "",
-        "api_key": ""
-    },
-    "id": "",
-    "temp_pass": ""
+    "id": "-",
+    "temp_pass": "-"
 }
 
 def write_json_file(config, file_name):

@@ -38,6 +38,8 @@ class ValidationFn(service.sys_manager.ProcessManagement):
         try: self.forced = int(self.config.get("validation_fn", {}).get("forced", 0))
         except: self.forced = 0
 
+        self.reboot_file = self.config.get("validation_fn", {}).get("reboot_file", "reboot.bat")
+
         self.time_sleep_ms = None
         self.hh = None
         self.mm = None
@@ -388,9 +390,10 @@ class ValidationFn(service.sys_manager.ProcessManagement):
                     sending_data.send_fiscals_data()
 
                 if reboot_flag == 0:
-                    process_not_found = self.check_process_cycle(self.updater_name, kill_process=True)
-                    if process_not_found:
-                        self.subprocess_run("updater", self.updater_name)
+                    if self.updater_enabled == True:
+                        process_not_found = self.check_process_cycle(self.updater_name, kill_process=True)
+                        if process_not_found:
+                            self.subprocess_run("updater", self.updater_name)
                 else:
                     if self.target_time == 0:
                         self.subprocess_run("_resources", self.reboot_file)

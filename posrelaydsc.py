@@ -38,7 +38,7 @@ def run_without_arguments():
             for attempt in range(18):
                 process_found = shtrihscanner.check_process(shtrihscanner.exe_name)
                 if process_found:
-                    service.logger.logger_service.debug("Cледующая проверка через (5) секунд.")
+                    service.logger.logger_service.debug("Следующая проверка через (5) секунд.")
                     time.sleep(5)
                     continue
                 else:
@@ -56,9 +56,10 @@ def run_without_arguments():
             service.logger.logger_service.info("Производится отправка данных на сервер")
             sending_data.send_fiscals_data()
 
-        process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, count_attempt=120)
-        if process_not_found:
-            validation_fn.subprocess_run("updater", validation_fn.updater_name)
+        if sending_data.updater_enabled == True:
+            process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, count_attempt=120)
+            if process_not_found:
+                validation_fn.subprocess_run("updater", validation_fn.updater_name)
     except Exception:
         service.logger.logger_service.error(
             "Запуск исполняемого файла без аргументов завершился c ошибкой", exc_info=True)
@@ -68,9 +69,9 @@ def get_fiscals_data():
     mitsu.get_data()
 
 class Service(win32serviceutil.ServiceFramework):
-    _svc_name_ = "POSRelayd"  # Название службы
-    _svc_display_name_ = "POSRelayd"  # Отображаемое имя службы
-    _svc_description_ = "Check Fiscal Service"  # Описание службы
+    _svc_name_ = about.service_name  # Название службы
+    _svc_display_name_ = about.service_name  # Отображаемое имя службы
+    _svc_description_ = "Remote Access and Check Fiscal Service"  # Описание службы
     _svc_start_type_ = win32service.SERVICE_AUTO_START  # Автозапуск
 
     def __init__(self, args):
@@ -108,7 +109,7 @@ class Service(win32serviceutil.ServiceFramework):
 
         try:
             if cmdclient.ra_enabled == True:
-                threading.Thread(target=cmdclient.run, daemon=True).start()
+                threading.Thread(target=cmdclient.run, args=(self,), daemon=True).start()
 
             fiscals_data = multiprocessing.Process(target=get_fiscals_data)
             fiscals_data.daemon = True
@@ -125,9 +126,10 @@ class Service(win32serviceutil.ServiceFramework):
                     service.logger.logger_service.info("Производится отправка данных на сервер")
                     sending_data.send_fiscals_data()
 
-                process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, kill_process=True)
-                if process_not_found:
-                    validation_fn.subprocess_run("updater", validation_fn.updater_name)
+                if cmdclient.updater_enabled == True:
+                    process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, kill_process=True)
+                    if process_not_found:
+                        validation_fn.subprocess_run("updater", validation_fn.updater_name)
         except Exception:
             service.logger.logger_service.critical(
                 f"Запуск основного потока службы завершился с ошибкой", exc_info=True)

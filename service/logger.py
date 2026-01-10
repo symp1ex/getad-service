@@ -109,4 +109,3 @@ def logger(file_name, with_console=False):
 
 logger_service = logger(f"service", with_console=True)
 kkt = logger(f"kkt", with_console=True)
-ra = logger(f"remote-access", with_console=True)

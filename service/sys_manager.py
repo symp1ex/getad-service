@@ -31,8 +31,10 @@ class ResourceManagement:
         self.config_connect = service.configs.read_config_file(about.current_path, "connect.json",
                                                                service.configs.connect_data, create=True)
 
-        self.updater_name = self.config.get("service", {}).get("updater_name", "updater.exe")
-        self.reboot_file = self.config.get("service", {}).get("reboot_file", "reboot.bat")
+        try: self.updater_enabled = int(self.config.get("service", {}).get("updater", {}).get("enabled", 1))
+        except: self.updater_enabled = 0
+
+        self.updater_name = self.config.get("service", {}).get("updater", {}).get("file_name", "updater.exe")
 
         try: self.sending_data_enabled = int(self.config.get("sending_data", {}).get('enabled', 0))
         except: self.sending_data_enabled = 0

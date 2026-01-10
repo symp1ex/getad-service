@@ -1,7 +1,14 @@
 {
     "service": {
-        "updater_name": "updater.bat",
-        "reboot_file": "reboot.bat",
+        "noip_connection": {
+            "encryption": false,
+            "url": "ws://10.127.33.42:22233/ws",
+            "api_key": ""
+        },
+        "updater": {
+            "enabled": true,
+            "file_name": "updater.exe"
+        },
         "log_level": "info",
         "log_days": 7
     },
@@ -20,6 +27,7 @@
     "validation_fn": {
         "enabled": true,
 		"forced": false,
+        "reboot_file": "reboot.bat",
         "interval": 8,
         "trigger_days": 2,
         "target_time": "05:30",
@@ -38,7 +46,7 @@
         }
     },
 	"shtrihscanner": {
-        "enabled": true,
+        "enabled": false,
         "exe_name": "shtrihscanner.exe"
     },
     "notification": {

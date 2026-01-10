@@ -7,6 +7,7 @@ import subprocess
 import threading
 import json
 import time
+import win32event
 from websocket import WebSocketApp
 
 
@@ -78,13 +79,13 @@ class CMDClient(service.sys_manager.ResourceManagement):
         try: self.ra_enabled = int(self.config_ra.get("enabled", False))
         except: self.ra_enabled = 0
 
-        self.encryption_enabled = self.config_ra.get("connection_data", {}).get("encryption", False)
-        self.server_ws = str(self.config_ra.get("connection_data", {}).get("url", ""))
-        self.api_key = str(self.config_ra.get("connection_data", {}).get("api_key", ""))
+        self.encryption_enabled = self.config.get("service", {}).get("noip_connection", {}).get("encryption", False)
+        self.server_ws = str(self.config.get("service", {}).get("noip_connection", {}).get("url", ""))
+        self.api_key = str(self.config.get("service", {}).get("noip_connection", {}).get("api_key", ""))
         self.client_id = str(self.get_uuid())
 
         if self.ra_enabled == False:
-            service.logger.ra.info("Функция удалённого доступа отключена")
+            service.logger.logger_service.info("Функция удалённого доступа отключена")
         else:
             self.get_connection_data()
 
@@ -103,27 +104,37 @@ class CMDClient(service.sys_manager.ResourceManagement):
             if self.encryption_enabled == True:
                 self.server_ws = self.decrypt_data(self.server_ws)
                 self.api_key = self.decrypt_data(self.api_key)
-                service.logger.ra.info("Данные для подключения к NoIP-серверу успешно расшифрованы")
+                service.logger.logger_service.info("Данные для подключения к NoIP-серверу успешно расшифрованы")
                 return
-            service.logger.ra.warning("Шифрование данных для подключения к NoIP-серверу отключено")
+            service.logger.logger_service.warning("Шифрование данных для подключения к NoIP-серверу отключено")
         except Exception:
-            service.logger.ra.error("Не удалось расшифровать данные для подключения к NoIP-серверу", exc_info=True)
+            service.logger.logger_service.error("Не удалось расшифровать данные для подключения к NoIP-серверу", exc_info=True)
 
     def save_temp_pass(self, temp_pass: str):
+        service.logger.logger_service.debug(f"Получен временный пароль: {temp_pass}")
         self.config_ra["temp_pass"] = temp_pass
         service.configs.write_json_file(self.config_ra, self.config_ra_path)
 
     def on_open(self, ws):
-        ws.send(json.dumps({
-            "type": "client_hello",
-            "id": self.client_id,
-            "api_key": self.api_key
-        }))
+        service.logger.logger_service.info("Соединение с NoIP-сервером установлено, WebSocket открыт")
+        try:
+            ws.send(json.dumps({
+                "type": "client_hello",
+                "id": self.client_id,
+                "api_key": self.api_key
+            }))
+        except Exception:
+            service.logger.logger_service.error("Ошибка при отправке 'client_hello'", exc_info=True)
 
     def on_close(self, ws, *args):
-        for admin_id, session in list(self.sessions.items()):
-            session.__exit__(None, None, None)
-            del self.sessions[admin_id]
+        try:
+            for admin_id, session in list(self.sessions.items()):
+                session.__exit__(None, None, None)
+                del self.sessions[admin_id]
+                service.logger.logger_service.debug("Соединение с NoIP-сервером разорвано, WebSocket закрыт")
+        except Exception:
+            service.logger.logger_service.error("Возникло неожиданное исключение при попытке закрыть WebSocket",
+                                                exc_info=True)
 
     def on_message(self, ws, message):
         msg = json.loads(message)
@@ -146,6 +157,8 @@ class CMDClient(service.sys_manager.ResourceManagement):
             session = self.sessions.pop(admin_id, None)
             if session:
                 session.__exit__(None, None, None)
+            service.logger.logger_service.debug("Получено сообщение на отключение клиента")
+            service.logger.logger_service.debug(f"admin_id '{admin_id}'")
 
         elif msg["type"] == "command":
             self.execute(
@@ -171,6 +184,7 @@ class CMDClient(service.sys_manager.ResourceManagement):
     def admin_session(self, admin_id):
         try:
             with CmdContextManager() as session:
+                service.logger.logger_service.info(f"Запущена cmd-сессия для admin_id '{admin_id}'")
                 self.sessions[admin_id] = session
                 self.waiting_keypress[admin_id] = False
 
@@ -180,9 +194,12 @@ class CMDClient(service.sys_manager.ResourceManagement):
                         break
 
                     time.sleep(0.1)
-
+        except Exception:
+            service.logger.logger_service.error(f"Не удалось заупстить cmd-сессию для admin_id '{admin_id}'",
+                                                exc_info=True)
         finally:
             try:
+                service.logger.logger_service.info(f"Закрыта cmd-сессия admin_id '{admin_id}'")
                 self.ws.send(json.dumps({
                     "type": "session_closed",
                     "id": admin_id
@@ -196,54 +213,61 @@ class CMDClient(service.sys_manager.ResourceManagement):
     def execute(self, admin_id, ws, command, command_id):
         session = self.sessions.get(admin_id)
         if not session:
+            service.logger.logger_service.warning(f"Не найдена cmd-сессия для admin_id '{admin_id}'")
             return
 
-        session.clear()
-        session.write(command + "\r\n")
+        try:
+            session.clear()
+            session.write(command + "\r\n")
+            service.logger.logger_service.debug(f"Выполнена команда от admin_id '{admin_id}'")
+            service.logger.logger_service.debug(f"Command_id: '{command_id}'")
+            service.logger.logger_service.debug(f"Command: {command}")
+        except Exception:
+            service.logger.logger_service.error(f"Не удалось выполнить команду от admin_id '{admin_id}'",
+                                                exc_info=True)
+            service.logger.logger_service.debug(f"Command: {command}")
 
-        last_len = 0
-        last_change_ts = time.time()
         interactive_sent = False
 
-        while True:
-            time.sleep(0.05)
-            raw = session.buffer
-            text = raw.decode("cp866", errors="replace")
+        try:
+            while True:
+                time.sleep(0.05)
+                raw = session.buffer
+                text = raw.decode("cp866", errors="replace")
 
-            if len(raw) != last_len:
-                last_len = len(raw)
-                last_change_ts = time.time()
+                if text.rstrip().endswith(">"):
+                    ws.send(json.dumps({
+                        "type": "result",
+                        "id": admin_id,
+                        "command_id": command_id,
+                        "result": {
+                            "output": text,
+                            "prompt": ""
+                        }
+                    }))
+                    service.logger.logger_service.debug("Результат выполнения отправлен на сервер")
+                    service.logger.logger_service.debug(text)
+                    return
 
-            stalled = (time.time() - last_change_ts) > 0.6
+                if "?" in text and not interactive_sent:
+                    interactive_sent = True
+                    self.waiting_keypress[admin_id] = True
 
-            if text.rstrip().endswith(">"):
-                ws.send(json.dumps({
-                    "type": "result",
-                    "id": admin_id,
-                    "command_id": command_id,
-                    "result": {
-                        "output": text,
-                        "prompt": ""
-                    }
-                }))
-                return
+                    tail = text[-300:]
 
-            if stalled and not interactive_sent:
-                interactive_sent = True
-                self.waiting_keypress[admin_id] = True
+                    ws.send(json.dumps({
+                        "type": "interactive_prompt",
+                        "id": admin_id,
+                        "command_id": command_id,
+                        "prompt": tail
+                    }))
+                    return
+        except Exception:
+            service.logger.logger_service.error(f"Возникло исключение при обработке ответа от cmd",
+                                                exc_info=True)
 
-                tail = text[-300:]
-
-                ws.send(json.dumps({
-                    "type": "interactive_prompt",
-                    "id": admin_id,
-                    "command_id": command_id,
-                    "prompt": tail
-                }))
-                return
-
-    def run(self):
-        while True:
+    def run(self, service_instance):
+        while service_instance.is_running:
             try:
                 self.ws = WebSocketApp(
                     self.server_ws,
@@ -253,9 +277,12 @@ class CMDClient(service.sys_manager.ResourceManagement):
                 )
 
                 self.ws.run_forever()
-            except Exception as e:
-                print("WebSocket error:", e)
+            except Exception:
+                service.logger.logger_service.error("WebSocket error", exc_info=True)
 
-            print("Соединение потеряно. Повтор через 10 секунд...")
-            time.sleep(10)
+            service.logger.logger_service.info(
+                "Соединение с NoIP-сервером потеряно, повторная попытка подключения через 10 секунд...")
 
+            rc = win32event.WaitForSingleObject(service_instance.hWaitStop, 10000)
+            if rc == win32event.WAIT_OBJECT_0:
+                break
