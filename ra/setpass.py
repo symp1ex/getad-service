@@ -28,51 +28,52 @@ def get_connection_data():
 
 def send_password_once(password: str):
     service.logger.logger_service.info("Сделан запрос на установку постоянного пароля")
+
     try:
         get_connection_data()
-
         done = False
 
         def on_open(ws):
             service.logger.logger_service.info("Соединение с NoIP-сервером установлено, WebSocket открыт")
-            try:
-                payload = {
-                    "type": "client_hello",
-                    "id": CLIENT_ID,
-                    "api_key": API_KEY,
-                    "password": password
-                }
-                ws.send(json.dumps(payload))
-
-            except Exception:
-                service.logger.logger_service.error("Ошибка при отправке 'client_hello'", exc_info=True)
+            ws.send(json.dumps({
+                "type": "client_hello",
+                "id": CLIENT_ID,
+                "api_key": API_KEY,
+                "password": password
+            }))
 
         def on_message(ws, message):
             nonlocal done
-            try:
-                service.logger.logger_service.debug(f"Получено сообщение от сервера: {message}")
-                msg = json.loads(message)
+            msg = json.loads(message)
 
-                # сервер может прислать temp_pass — игнорируем
+            if msg.get("type") == "password_updated":
                 done = True
+                service.logger.logger_service.info("Сервер подтвердил смену пароля")
                 ws.close()
-                service.logger.logger_service.debug("Сообщение обработано, WebSocket закрыт")
-            except Exception:
-                service.logger.logger_service.error("Ошибка при обработке входящего сообщения", exc_info=True)
+                service.logger.logger_service.info("Соединение с NoIP-сервером разорвано, WebSocket закрыт")
 
+        def on_close(ws, code, reason):
+            if not done:
+                service.logger.logger_service.warning(
+                    f"Соединение закрыто без подтверждения смены пароля (code={code}, reason={reason})"
+                )
 
         ws = WebSocketApp(
             SERVER_WS,
             on_open=on_open,
-            on_message=on_message
+            on_message=on_message,
+            on_close=on_close
         )
 
         ws.run_forever()
-        time.sleep(0.2)
 
         if done:
-            service.logger.logger_service.info("Пароль успешно отправлен и обработан сервером, WebSocket закрыт")
+            service.logger.logger_service.info("Пароль успешно изменён")
         else:
             service.logger.logger_service.warning("Пароль не был подтверждён сервером")
+
     except Exception:
-        service.logger.logger_service.error("Не удалось выполнить запрос на изменение постоянного пароля", exc_info=True)
+        service.logger.logger_service.error(
+            "Не удалось выполнить запрос на изменение постоянного пароля",
+            exc_info=True
+        )

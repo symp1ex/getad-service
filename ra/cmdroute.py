@@ -246,7 +246,6 @@ class CMDClient(service.sys_manager.ResourceManagement):
                         }
                     }))
                     service.logger.logger_service.debug("Результат выполнения отправлен на сервер")
-                    service.logger.logger_service.debug(text)
                     return
 
                 if "?" in text and not interactive_sent:

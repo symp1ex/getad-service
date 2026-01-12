@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 logs/
 date/
+gui/
 updater/
 uuid
 main-temp.py
