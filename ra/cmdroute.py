@@ -96,7 +96,8 @@ class CMDClient(service.sys_manager.ResourceManagement):
             self.server_ws,
             on_open=self.on_open,
             on_message=self.on_message,
-            on_close=self.on_close
+            on_close=self.on_close,
+            on_error=self.on_error,
         )
 
     def get_connection_data(self):
@@ -109,6 +110,20 @@ class CMDClient(service.sys_manager.ResourceManagement):
             service.logger.logger_service.warning("Шифрование данных для подключения к NoIP-серверу отключено")
         except Exception:
             service.logger.logger_service.error("Не удалось расшифровать данные для подключения к NoIP-серверу", exc_info=True)
+
+    def on_error(self, ws, error):
+        err = str(error)
+
+        if "403" in err or "forbidden" in err.lower():
+            service.logger.logger_service.critical(
+                "Подключение отклонено сервером: IP заблокирован"
+            )
+            self.ra_enabled = False
+            return
+
+        service.logger.logger_service.error(
+            f"WebSocket error: {error}"
+        )
 
     def save_temp_pass(self, temp_pass: str):
         service.logger.logger_service.debug(f"Получен временный пароль: {temp_pass}")
@@ -138,6 +153,12 @@ class CMDClient(service.sys_manager.ResourceManagement):
 
     def on_message(self, ws, message):
         msg = json.loads(message)
+
+        if msg.get("type") == "error":
+            service.logger.logger_service.error(
+                f"Ошибка от сервера: {msg.get('error')}"
+            )
+            return
 
         if msg["type"] == "temp_pass":
             self.save_temp_pass(msg["temp_pass"])
@@ -274,20 +295,21 @@ class CMDClient(service.sys_manager.ResourceManagement):
                                                 exc_info=True)
 
     def run(self, service_instance):
-        while service_instance.is_running:
+        while service_instance.is_running and self.ra_enabled:
             try:
                 self.ws = WebSocketApp(
                     self.server_ws,
                     on_open=self.on_open,
                     on_message=self.on_message,
                     on_close=self.on_close,
+                    on_error=self.on_error,
                 )
 
                 self.ws.run_forever()
             except Exception:
                 service.logger.logger_service.error("WebSocket error", exc_info=True)
 
-            service.logger.logger_service.info(
+            service.logger.logger_service.warning(
                 "Соединение с NoIP-сервером потеряно, повторная попытка подключения через 10 секунд...")
 
             rc = win32event.WaitForSingleObject(service_instance.hWaitStop, 10000)

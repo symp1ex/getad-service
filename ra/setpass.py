@@ -25,6 +25,18 @@ def get_connection_data():
     except Exception:
         service.logger.logger_service.error("Не удалось расшифровать данные для подключения к NoIP-серверу", exc_info=True)
 
+def on_error(ws, error):
+    err = str(error)
+
+    # Проверяем, заблокирован ли IP
+    if "403" in err or "forbidden" in err.lower():
+        service.logger.logger_service.critical(
+            "Подключение отклонено сервером: IP заблокирован"
+        )
+
+    service.logger.logger_service.error(
+        f"WebSocket error: {error}"
+    )
 
 def send_password_once(password: str):
     service.logger.logger_service.info("Сделан запрос на установку постоянного пароля")
@@ -46,6 +58,13 @@ def send_password_once(password: str):
             nonlocal done
             msg = json.loads(message)
 
+            if msg.get("type") == "error":
+                service.logger.logger_service.error(
+                    f"Ошибка от сервера: {msg.get('error')}"
+                )
+                ws.close()
+                service.logger.logger_service.info("Соединение с NoIP-сервером разорвано, WebSocket закрыт")
+
             if msg.get("type") == "password_updated":
                 done = True
                 service.logger.logger_service.info("Сервер подтвердил смену пароля")
@@ -62,7 +81,8 @@ def send_password_once(password: str):
             SERVER_WS,
             on_open=on_open,
             on_message=on_message,
-            on_close=on_close
+            on_close=on_close,
+            on_error=on_error
         )
 
         ws.run_forever()
