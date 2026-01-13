@@ -160,13 +160,21 @@ class CMDClient(service.sys_manager.ResourceManagement):
             service.logger.logger_service.debug("Получено сообщение на отключение клиента")
             service.logger.logger_service.debug(f"admin_id '{admin_id}'")
 
+
         elif msg["type"] == "command":
-            self.execute(
-                msg["id"],
-                ws,
-                msg["command"],
-                msg["command_id"]
-            )
+            admin_id = msg["id"]
+
+            if msg["command"].strip().lower() == "exit":
+                session = self.sessions.pop(admin_id, None)
+                if session:
+                    session.__exit__(None, None, None)
+                ws.send(json.dumps({
+                    "type": "session_closed",
+                    "id": admin_id
+                }))
+            else:
+                self.execute(msg["id"], ws, msg["command"], msg["command_id"])
+
 
         elif msg["type"] == "interactive_response":
             admin_id = msg["id"]
@@ -195,7 +203,7 @@ class CMDClient(service.sys_manager.ResourceManagement):
 
                     time.sleep(0.1)
         except Exception:
-            service.logger.logger_service.error(f"Не удалось заупстить cmd-сессию для admin_id '{admin_id}'",
+            service.logger.logger_service.error(f"Не удалось запустить cmd-сессию для admin_id '{admin_id}'",
                                                 exc_info=True)
         finally:
             try:
