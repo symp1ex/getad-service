@@ -256,6 +256,14 @@ class CMDClient(service.sys_manager.ResourceManagement):
                                                 exc_info=True)
             service.logger.logger_service.debug(f"Command: {command}")
 
+            session = self.sessions.pop(admin_id, None)
+            if session:
+                session.__exit__(None, None, None)
+            ws.send(json.dumps({
+                "type": "session_closed",
+                "id": admin_id
+            }))
+
         interactive_sent = False
 
         try:
@@ -277,11 +285,11 @@ class CMDClient(service.sys_manager.ResourceManagement):
                     service.logger.logger_service.debug("Результат выполнения отправлен на сервер")
                     return
 
-                if "?" in text and not interactive_sent:
+                if ("?" in text or ". . ." in text) and not interactive_sent:
                     interactive_sent = True
                     self.waiting_keypress[admin_id] = True
 
-                    tail = text[-300:]
+                    tail = text[-10000:]
 
                     ws.send(json.dumps({
                         "type": "interactive_prompt",
@@ -293,6 +301,14 @@ class CMDClient(service.sys_manager.ResourceManagement):
         except Exception:
             service.logger.logger_service.error(f"Возникло исключение при обработке ответа от cmd",
                                                 exc_info=True)
+
+            session = self.sessions.pop(admin_id, None)
+            if session:
+                session.__exit__(None, None, None)
+            ws.send(json.dumps({
+                "type": "session_closed",
+                "id": admin_id
+            }))
 
     def run(self, service_instance):
         while service_instance.is_running and self.ra_enabled:
