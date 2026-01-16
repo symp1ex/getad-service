@@ -267,37 +267,73 @@ class CMDClient(service.sys_manager.ResourceManagement):
         interactive_sent = False
 
         try:
+            last_len = 0
+            line_buffer = ""
+            interactive_sent = False
+
             while True:
                 time.sleep(0.05)
-                raw = session.buffer
-                text = raw.decode("cp866", errors="replace")
 
-                if text.rstrip().endswith(">"):
+                raw = session.buffer
+                if len(raw) <= last_len:
+                    continue
+
+                # берём только новые данные
+                chunk = raw[last_len:]
+                last_len = len(raw)
+
+                text = chunk.decode("cp866", errors="replace")
+                line_buffer += text
+
+                # разбиваем на строки
+                lines = line_buffer.splitlines(keepends=True)
+
+                # если последняя строка не завершена — оставляем в буфере
+                if not lines[-1].endswith(("\n", "\r")):
+                    line_buffer = lines.pop()
+                else:
+                    line_buffer = ""
+
+                for line in lines:
+                    # === обычная строка вывода ===
                     ws.send(json.dumps({
                         "type": "result",
                         "id": admin_id,
                         "command_id": command_id,
                         "result": {
-                            "output": text,
+                            "output": line
+                        }
+                    }))
+                lines = text.splitlines()
+
+                # === завершение команды ===
+                if line_buffer.rstrip().endswith(">"):
+                    ws.send(json.dumps({
+                        "type": "result",
+                        "id": admin_id,
+                        "command_id": command_id,
+                        "result": {
+                            "output": lines[-1],
                             "prompt": ""
                         }
                     }))
-                    service.logger.logger_service.debug("Результат выполнения отправлен на сервер")
+                    service.logger.logger_service.debug(
+                        "Результат выполнения отправлен на сервер"
+                    )
                     return
 
                 if ("?" in text or ". . ." in text) and not interactive_sent:
                     interactive_sent = True
                     self.waiting_keypress[admin_id] = True
 
-                    tail = text[-10000:]
-
                     ws.send(json.dumps({
                         "type": "interactive_prompt",
                         "id": admin_id,
                         "command_id": command_id,
-                        "prompt": tail
+                        "prompt": lines[-1]
                     }))
                     return
+
         except Exception:
             service.logger.logger_service.error(f"Возникло исключение при обработке ответа от cmd",
                                                 exc_info=True)
