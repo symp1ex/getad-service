@@ -6,7 +6,6 @@ import service.connectors
 import getdata.atol.atol
 import getdata.shtrih
 import getdata.mitsu
-import ra.cmdroute
 import about
 import win32serviceutil
 import win32service
@@ -23,6 +22,7 @@ validation_fn = service.fn_check.ValidationFn()
 shtrihscanner = getdata.shtrih.ShtrihData()
 mitsu = getdata.mitsu.MitsuGetData()
 sending_data = service.connectors.SendingData()
+
 
 def run_without_arguments():
     try:
@@ -79,9 +79,22 @@ class Service(win32serviceutil.ServiceFramework):
         self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
         socket.setdefaulttimeout(60)
         self.is_running = True
+        self.cmdclient_instance = None
+
+    def cmdclient_init(self):
+        import ra.cmdroute
+        self.cmdclient_instance = ra.cmdroute.CMDClient()
 
     def SvcStop(self):
         shtrihscanner.subprocess_kill("", shtrihscanner.exe_name)
+        service.logger.logger_service.debug(f"Cписок активных cmd-сессий: {self.cmdclient_instance.sessions}")
+
+        sessions = self.cmdclient_instance.sessions
+
+        for admin_id in list(sessions):
+            session = self.cmdclient_instance.sessions.pop(admin_id, None)
+            if session:
+                session.__exit__(None, None, None)
 
         self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
         win32event.SetEvent(self.hWaitStop)
@@ -105,11 +118,11 @@ class Service(win32serviceutil.ServiceFramework):
         self.main()
 
     def main(self):
-        cmdclient = ra.cmdroute.CMDClient()
-
         try:
-            if cmdclient.ra_enabled == True:
-                threading.Thread(target=cmdclient.run, args=(self,), daemon=True).start()
+            self.cmdclient_init()
+
+            if self.cmdclient_instance.ra_enabled == True:
+                threading.Thread(target=self.cmdclient_instance.run, args=(self,), daemon=True).start()
 
             fiscals_data = multiprocessing.Process(target=get_fiscals_data)
             fiscals_data.daemon = True
@@ -126,7 +139,7 @@ class Service(win32serviceutil.ServiceFramework):
                     service.logger.logger_service.info("Производится отправка данных на сервер")
                     sending_data.send_fiscals_data()
 
-                if cmdclient.updater_enabled == True:
+                if self.cmdclient_instance.updater_enabled == True:
                     process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, kill_process=True)
                     if process_not_found:
                         validation_fn.subprocess_run("updater", validation_fn.updater_name)
