@@ -24,7 +24,8 @@ class CmdContextManager:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            bufsize=0
+            bufsize=0,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
         )
 
         self.alive.set()
@@ -60,8 +61,8 @@ class CmdContextManager:
         self.alive.clear()
         try:
             if self.proc:
-                self.proc.kill()
-                self.proc.wait(timeout=1)
+                command = f"taskkill /PID \"{self.proc.pid}\" /T /F"
+                subprocess.run(command, shell=True)
         except Exception:
             pass
 
@@ -99,6 +100,7 @@ class CMDClient(service.sys_manager.ResourceManagement):
             on_close=self.on_close,
             on_error=self.on_error,
         )
+
 
     def get_connection_data(self):
         try:
@@ -210,6 +212,11 @@ class CMDClient(service.sys_manager.ResourceManagement):
                 session.write(msg["command"] + "\r\n")
             self.waiting_keypress[admin_id] = False
 
+        elif msg["type"] == "control":
+            if msg.get("command") == "CTRL_C":
+                service.logger.logger_service.debug("Получена команда 'Ctrl+C'")
+                self.send_ctrl_c(msg["id"])
+
     def admin_session(self, admin_id):
         try:
             with CmdContextManager() as session:
@@ -239,31 +246,18 @@ class CMDClient(service.sys_manager.ResourceManagement):
             self.sessions.pop(admin_id, None)
             self.waiting_keypress.pop(admin_id, None)
 
-    def execute(self, admin_id, ws, command, command_id):
+    def send_ctrl_c(self, admin_id):
         session = self.sessions.get(admin_id)
-        if not session:
-            service.logger.logger_service.warning(f"Не найдена cmd-сессия для admin_id '{admin_id}'")
+        if not session or not session.proc:
             return
 
-        try:
-            session.clear()
-            session.write(command + "\r\n")
-            service.logger.logger_service.debug(f"Выполнена команда от admin_id '{admin_id}'")
-            service.logger.logger_service.debug(f"Command_id: '{command_id}'")
-            service.logger.logger_service.debug(f"Command: {command}")
-        except Exception:
-            service.logger.logger_service.error(f"Не удалось выполнить команду от admin_id '{admin_id}'",
-                                                exc_info=True)
-            service.logger.logger_service.debug(f"Command: {command}")
+        service.logger.logger_service.debug(session.proc.pid)
 
-            session = self.sessions.pop(admin_id, None)
-            if session:
-                session.__exit__(None, None, None)
-            ws.send(json.dumps({
-                "type": "session_closed",
-                "id": admin_id
-            }))
+        command = f"taskkill /PID \"{session.proc.pid}\" /T /F"
 
+        subprocess.run(command, shell=True)
+
+    def _send_cmd_output(self, admin_id, ws, command_id, session):
         interactive_sent = False
 
         try:
@@ -295,7 +289,7 @@ class CMDClient(service.sys_manager.ResourceManagement):
                     line_buffer = ""
 
                 for line in lines:
-                    # === обычная строка вывода ===
+                    # обычная строка вывода
                     ws.send(json.dumps({
                         "type": "result",
                         "id": admin_id,
@@ -306,7 +300,7 @@ class CMDClient(service.sys_manager.ResourceManagement):
                     }))
                 lines = text.splitlines()
 
-                # === завершение команды ===
+                # завершение команды
                 if line_buffer.rstrip().endswith(">"):
                     ws.send(json.dumps({
                         "type": "result",
@@ -345,6 +339,37 @@ class CMDClient(service.sys_manager.ResourceManagement):
                 "type": "session_closed",
                 "id": admin_id
             }))
+
+    def execute(self, admin_id, ws, command, command_id):
+        session = self.sessions.get(admin_id)
+        if not session:
+            service.logger.logger_service.warning(f"Не найдена cmd-сессия для admin_id '{admin_id}'")
+            return
+
+        try:
+            session.clear()
+            session.write(command + "\r\n")
+            service.logger.logger_service.debug(f"Выполнена команда от admin_id '{admin_id}'")
+            service.logger.logger_service.debug(f"Command_id: '{command_id}'")
+            service.logger.logger_service.debug(f"Command: {command}")
+        except Exception:
+            service.logger.logger_service.error(f"Не удалось выполнить команду от admin_id '{admin_id}'",
+                                                exc_info=True)
+            service.logger.logger_service.debug(f"Command: {command}")
+
+            session = self.sessions.pop(admin_id, None)
+            if session:
+                session.__exit__(None, None, None)
+            ws.send(json.dumps({
+                "type": "session_closed",
+                "id": admin_id
+            }))
+
+        threading.Thread(
+            target=self._send_cmd_output,
+            args=(admin_id, ws, command_id, session),
+            daemon=True
+        ).start()
 
     def run(self, service_instance):
         while service_instance.is_running and self.ra_enabled:
