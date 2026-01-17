@@ -9,7 +9,7 @@ import json
 import time
 import win32event
 from websocket import WebSocketApp
-
+import win32job
 
 class CmdContextManager:
     def __init__(self):
@@ -17,8 +17,26 @@ class CmdContextManager:
         self.buffer = b""
         self.alive = threading.Event()
         self.reader_thread = None
+        self.job = None
 
     def __enter__(self):
+        self.job = win32job.CreateJobObject(None, "")
+
+        info = win32job.QueryInformationJobObject(
+            self.job,
+            win32job.JobObjectExtendedLimitInformation
+        )
+
+        info["BasicLimitInformation"]["LimitFlags"] |= (
+            win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        )
+
+        win32job.SetInformationJobObject(
+            self.job,
+            win32job.JobObjectExtendedLimitInformation,
+            info
+        )
+
         self.proc = subprocess.Popen(
             ["cmd.exe"],
             stdin=subprocess.PIPE,
@@ -27,6 +45,8 @@ class CmdContextManager:
             bufsize=0,
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
         )
+
+        win32job.AssignProcessToJobObject(self.job, self.proc._handle)
 
         self.alive.set()
         self.reader_thread = threading.Thread(
