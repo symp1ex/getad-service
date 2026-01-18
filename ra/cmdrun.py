@@ -14,6 +14,8 @@ class CmdContextManager:
     def __init__(self):
         self.proc = None
         self.buffer = b""
+        self.initial_output = None
+        self.initial_output_captured = False
         self.alive = threading.Event()
         self.reader_thread = None
         self.job = None
@@ -89,6 +91,14 @@ class CmdContextManager:
                 if not data:
                     break
                 self.buffer += data
+
+                if not self.initial_output_captured:
+                    decoded = self.buffer.decode("cp866", errors="replace")
+
+                    # cmd готов — появился prompt
+                    if decoded.rstrip().endswith(">"):
+                        self.initial_output = decoded
+                        self.initial_output_captured = True
         except Exception:
             pass
 

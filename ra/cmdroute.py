@@ -143,6 +143,20 @@ class CMDClient(service.sys_manager.ResourceManagement):
                 self.sessions[admin_id] = session
                 self.waiting_keypress[admin_id] = False
 
+                timeout = time.time() + 2
+                while session.initial_output == None and time.time() < timeout:
+                    time.sleep(0.1)
+
+                if session.initial_output:
+                    self.ws.send(json.dumps({
+                        "type": "result",
+                        "id": admin_id,
+                        "command_id": None,
+                        "result": {
+                            "output": f"\n{session.initial_output}"
+                        }
+                    }))
+
                 while admin_id in self.sessions:
                     if session.user_session == True:
                         if not is_process_alive(session.proc["hProcess"]):
@@ -178,44 +192,44 @@ class CMDClient(service.sys_manager.ResourceManagement):
             session.__exit__(None, None, None)
 
     def _send_cmd_output(self, admin_id, ws, command_id, session):
-        last_sent_text = ""  # хранит то, что уже отправили
+        last_pos = 0  # позиция в byte-буфере
+        first_line_skipped = False  # первая строка отброшена или нет
 
         try:
             while True:
                 time.sleep(0.05)
 
                 raw = session.buffer
-                if not raw:
+                if last_pos >= len(raw):
                     continue
 
-                # декодируем весь буфер
-                text = raw.decode("cp866", errors="replace")
+                chunk = raw[last_pos:]
+                last_pos = len(raw)
 
-                # находим только *новую часть*, которая ещё не отправлялась
-                if text.startswith(last_sent_text):
-                    new_text = text[len(last_sent_text):]
-                else:
-                    # если вдруг буфер "сбросился" или команда переписала старый вывод
-                    # отправляем весь текст, но обрезаем совпадение в хвосте
-                    overlap_len = 0
-                    max_overlap = min(len(last_sent_text), len(text))
-                    for i in range(1, max_overlap + 1):
-                        if last_sent_text[-i:] == text[:i]:
-                            overlap_len = i
-                    new_text = text[overlap_len:]
+                text = chunk.decode("cp866", errors="replace")
 
-                if new_text:
+                # пропуск первой строки
+                if not first_line_skipped:
+                    nl_index = text.find("\n")
+                    if nl_index == -1:
+                        # первая строка ещё не закончилась
+                        continue
+
+                    # отбрасываем всё до конца первой строки
+                    text = text[nl_index + 1:]
+                    first_line_skipped = True
+
+                if text:
                     ws.send(json.dumps({
                         "type": "result",
                         "id": admin_id,
                         "command_id": command_id,
                         "result": {
-                            "output": new_text
+                            "output": text
                         }
                     }))
-                    last_sent_text += new_text
 
-                # завершение команды
+                # --- завершение команды ---
                 if text.rstrip().endswith((">", "?", ":", ". . .")):
                     return
 
