@@ -128,7 +128,6 @@ class CMDClient(service.sys_manager.ResourceManagement):
             service.logger.logger_service.debug("Получено сообщение на отключение клиента")
             service.logger.logger_service.debug(f"admin_id '{admin_id}'")
 
-
         elif msg["type"] == "command":
             admin_id = msg["id"]
 
@@ -142,6 +141,11 @@ class CMDClient(service.sys_manager.ResourceManagement):
                 }))
             else:
                 self.execute(msg["id"], ws, msg["command"], msg["command_id"])
+
+        elif msg["type"] == "control":
+            if msg.get("command") == "CTRL_C":
+                service.logger.logger_service.debug("Получена команда 'Ctrl+C'")
+                self.send_ctrl_c(msg["id"])
 
     def admin_session(self, admin_id):
         try:
