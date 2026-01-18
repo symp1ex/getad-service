@@ -2,89 +2,14 @@ import about
 import service.logger
 import service.sys_manager
 import service.configs
+from ra.cmdrun import CmdContextManager, is_process_alive
 import os
-import subprocess
 import threading
 import json
 import time
 import win32event
 from websocket import WebSocketApp
-import win32job
 
-class CmdContextManager:
-    def __init__(self):
-        self.proc = None
-        self.buffer = b""
-        self.alive = threading.Event()
-        self.reader_thread = None
-        self.job = None
-
-    def __enter__(self):
-        self.job = win32job.CreateJobObject(None, "")
-
-        info = win32job.QueryInformationJobObject(
-            self.job,
-            win32job.JobObjectExtendedLimitInformation
-        )
-
-        info["BasicLimitInformation"]["LimitFlags"] |= (
-            win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-        )
-
-        win32job.SetInformationJobObject(
-            self.job,
-            win32job.JobObjectExtendedLimitInformation,
-            info
-        )
-
-        self.proc = subprocess.Popen(
-            ["cmd.exe"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            bufsize=0,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
-        )
-
-        win32job.AssignProcessToJobObject(self.job, self.proc._handle)
-
-        self.alive.set()
-        self.reader_thread = threading.Thread(
-            target=self._read_stdout,
-            daemon=True
-        )
-        self.reader_thread.start()
-        return self
-
-    def _read_stdout(self):
-        try:
-            while self.alive.is_set():
-                data = self.proc.stdout.read(1)
-                if not data:
-                    break
-                self.buffer += data
-        except Exception:
-            pass
-
-    def write(self, text: str):
-        if self.proc and self.proc.stdin:
-            self.proc.stdin.write(text.encode("cp866"))
-            self.proc.stdin.flush()
-
-    def read(self) -> str:
-        return self.buffer.decode("cp866", errors="replace")
-
-    def clear(self):
-        self.buffer = b""
-
-    def __exit__(self, exc_type, exc, tb):
-        self.alive.clear()
-        try:
-            if self.proc:
-                command = f"taskkill /PID \"{self.proc.pid}\" /T /F"
-                subprocess.run(command, shell=True)
-        except Exception:
-            pass
 
 
 class CMDClient(service.sys_manager.ResourceManagement):
@@ -218,25 +143,6 @@ class CMDClient(service.sys_manager.ResourceManagement):
             else:
                 self.execute(msg["id"], ws, msg["command"], msg["command_id"])
 
-
-        elif msg["type"] == "interactive_response":
-            admin_id = msg["id"]
-            session = self.sessions.get(admin_id)
-
-            if not session:
-                return
-
-            if self.waiting_keypress.get(admin_id):
-                session.write(msg["command"][:1])
-            else:
-                session.write(msg["command"] + "\r\n")
-            self.waiting_keypress[admin_id] = False
-
-        elif msg["type"] == "control":
-            if msg.get("command") == "CTRL_C":
-                service.logger.logger_service.debug("Получена команда 'Ctrl+C'")
-                self.send_ctrl_c(msg["id"])
-
     def admin_session(self, admin_id):
         try:
             with CmdContextManager() as session:
@@ -245,9 +151,12 @@ class CMDClient(service.sys_manager.ResourceManagement):
                 self.waiting_keypress[admin_id] = False
 
                 while admin_id in self.sessions:
-                    if session.proc.poll() is not None:
-                        # cmd.exe завершился (exit / crash)
-                        break
+                    if session.user_session == True:
+                        if not is_process_alive(session.proc["hProcess"]):
+                            break
+                    else:
+                        if session.proc.poll() is not None:
+                            break
 
                     time.sleep(0.1)
         except Exception:
@@ -271,90 +180,62 @@ class CMDClient(service.sys_manager.ResourceManagement):
         if not session or not session.proc:
             return
 
-        service.logger.logger_service.debug(session.proc.pid)
-
-        command = f"taskkill /PID \"{session.proc.pid}\" /T /F"
-
-        subprocess.run(command, shell=True)
+        session = self.sessions.pop(admin_id, None)
+        if session:
+            session.__exit__(None, None, None)
 
     def _send_cmd_output(self, admin_id, ws, command_id, session):
-        interactive_sent = False
+        last_sent_text = ""  # хранит то, что уже отправили
 
         try:
-            last_len = 0
-            line_buffer = ""
-            interactive_sent = False
-
             while True:
                 time.sleep(0.05)
 
                 raw = session.buffer
-                if len(raw) <= last_len:
+                if not raw:
                     continue
 
-                # берём только новые данные
-                chunk = raw[last_len:]
-                last_len = len(raw)
+                # декодируем весь буфер
+                text = raw.decode("cp866", errors="replace")
 
-                text = chunk.decode("cp866", errors="replace")
-                line_buffer += text
-
-                # разбиваем на строки
-                lines = line_buffer.splitlines(keepends=True)
-
-                # если последняя строка не завершена — оставляем в буфере
-                if not lines[-1].endswith(("\n", "\r")):
-                    line_buffer = lines.pop()
+                # находим только *новую часть*, которая ещё не отправлялась
+                if text.startswith(last_sent_text):
+                    new_text = text[len(last_sent_text):]
                 else:
-                    line_buffer = ""
+                    # если вдруг буфер "сбросился" или команда переписала старый вывод
+                    # отправляем весь текст, но обрезаем совпадение в хвосте
+                    overlap_len = 0
+                    max_overlap = min(len(last_sent_text), len(text))
+                    for i in range(1, max_overlap + 1):
+                        if last_sent_text[-i:] == text[:i]:
+                            overlap_len = i
+                    new_text = text[overlap_len:]
 
-                for line in lines:
-                    # обычная строка вывода
+                if new_text:
                     ws.send(json.dumps({
                         "type": "result",
                         "id": admin_id,
                         "command_id": command_id,
                         "result": {
-                            "output": line
+                            "output": new_text
                         }
                     }))
-                lines = text.splitlines()
+                    last_sent_text += new_text
 
                 # завершение команды
-                if line_buffer.rstrip().endswith(">"):
-                    ws.send(json.dumps({
-                        "type": "result",
-                        "id": admin_id,
-                        "command_id": command_id,
-                        "result": {
-                            "output": lines[-1],
-                            "prompt": ""
-                        }
-                    }))
-                    service.logger.logger_service.debug(
-                        "Результат выполнения отправлен на сервер"
-                    )
-                    return
-
-                if ("?" in text or ". . ." in text) and not interactive_sent:
-                    interactive_sent = True
-                    self.waiting_keypress[admin_id] = True
-
-                    ws.send(json.dumps({
-                        "type": "interactive_prompt",
-                        "id": admin_id,
-                        "command_id": command_id,
-                        "prompt": lines[-1]
-                    }))
+                if text.rstrip().endswith((">", "?", ":", ". . .")):
                     return
 
         except Exception:
-            service.logger.logger_service.error(f"Возникло исключение при обработке ответа от cmd",
-                                                exc_info=True)
+            service.logger.logger_service.error(
+                "Возникло исключение при обработке ответа от cmd",
+                exc_info=True
+            )
 
             session = self.sessions.pop(admin_id, None)
             if session:
                 session.__exit__(None, None, None)
+
             ws.send(json.dumps({
                 "type": "session_closed",
                 "id": admin_id
