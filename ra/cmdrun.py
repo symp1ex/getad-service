@@ -112,12 +112,8 @@ class CmdContextManager:
     def __exit__(self, exc_type, exc, tb):
         self.alive.clear()
         try:
-            if self.user_session == True:
-                if self.job:
-                    win32api.CloseHandle(self.job)
-            else:
-                command = f"taskkill /PID \"{self.proc.pid}\" /T /F"
-                subprocess.run(command, shell=True)
+            if self.job:
+                win32api.CloseHandle(self.job)
         except Exception:
             pass
 

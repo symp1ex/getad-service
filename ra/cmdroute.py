@@ -129,18 +129,7 @@ class CMDClient(service.sys_manager.ResourceManagement):
             service.logger.logger_service.debug(f"admin_id '{admin_id}'")
 
         elif msg["type"] == "command":
-            admin_id = msg["id"]
-
-            if msg["command"].strip().lower() == "exit":
-                session = self.sessions.pop(admin_id, None)
-                if session:
-                    session.__exit__(None, None, None)
-                ws.send(json.dumps({
-                    "type": "session_closed",
-                    "id": admin_id
-                }))
-            else:
-                self.execute(msg["id"], ws, msg["command"], msg["command_id"])
+            self.execute(msg["id"], ws, msg["command"], msg["command_id"])
 
         elif msg["type"] == "control":
             if msg.get("command") == "CTRL_C":
