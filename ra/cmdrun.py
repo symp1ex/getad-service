@@ -84,9 +84,9 @@ class CmdContextManager:
         try:
             while self.alive.is_set():
                 if self.user_session == True:
-                    data = win32file.ReadFile(self.proc["stdout"], 1)[1]
+                    hr, data = win32file.ReadFile(self.proc["stdout"], 4096)
                 else:
-                    data = self.proc.stdout.read(1)
+                    data = self.proc.stdout.read(4096)
 
                 if not data:
                     break
