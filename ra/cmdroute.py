@@ -11,7 +11,6 @@ import win32event
 from websocket import WebSocketApp
 
 
-
 class CMDClient(service.sys_manager.ResourceManagement):
     config_ra_name = "remote-access.json"
 
@@ -45,7 +44,6 @@ class CMDClient(service.sys_manager.ResourceManagement):
             on_close=self.on_close,
             on_error=self.on_error,
         )
-
 
     def get_connection_data(self):
         try:
@@ -197,7 +195,10 @@ class CMDClient(service.sys_manager.ResourceManagement):
 
         try:
             while True:
-                time.sleep(0.05)
+                time.sleep(0.1)
+
+                if admin_id not in self.sessions:
+                    return
 
                 raw = session.buffer
                 if last_pos >= len(raw):

@@ -121,7 +121,7 @@ class Service(win32serviceutil.ServiceFramework):
         try:
             self.cmdclient_init()
 
-            if self.cmdclient_instance.ra_enabled == True:
+            if self.cmdclient_instance.ra_enabled == True and validation_fn.validation == 1:
                 threading.Thread(target=self.cmdclient_instance.run, args=(self,), daemon=True).start()
 
             fiscals_data = multiprocessing.Process(target=get_fiscals_data)
@@ -143,6 +143,9 @@ class Service(win32serviceutil.ServiceFramework):
                     process_not_found = validation_fn.check_process_cycle(validation_fn.updater_name, kill_process=True)
                     if process_not_found:
                         validation_fn.subprocess_run("updater", validation_fn.updater_name)
+
+                if self.cmdclient_instance.ra_enabled == True:
+                    self.cmdclient_instance.run(self)
         except Exception:
             service.logger.logger_service.critical(
                 f"Запуск основного потока службы завершился с ошибкой", exc_info=True)
