@@ -291,7 +291,11 @@ class CMDClient(service.sys_manager.ResourceManagement):
                     on_error=self.on_error,
                 )
 
-                self.ws.run_forever()
+                self.ws.run_forever(
+                    ping_interval=30,
+                    ping_timeout=10,
+                    ping_payload="ping"
+                )
             except Exception:
                 service.logger.logger_service.error("WebSocket error", exc_info=True)
 
